@@ -36,12 +36,27 @@ class _HorionAppState extends State<HorionApp> {
         theme: ThemeData(
           brightness: Brightness.dark,
           colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF38BDF8),
+            seedColor: const Color(0xFF67E8D3),
             brightness: Brightness.dark,
-            surface: const Color(0xFF101827),
+            surface: const Color(0xFF111E25),
           ),
-          scaffoldBackgroundColor: const Color(0xFF060913),
+          scaffoldBackgroundColor: const Color(0xFF071219),
           useMaterial3: true,
+          cardTheme: CardThemeData(
+            elevation: 0,
+            margin: const EdgeInsets.all(4),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: Color(0xFF293B44)),
+            ),
+          ),
+          navigationRailTheme: const NavigationRailThemeData(
+            indicatorColor: Color(0xFF20483F),
+          ),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Color(0xFF071219),
+            elevation: 0,
+          ),
           inputDecorationTheme: const InputDecorationTheme(
             border: OutlineInputBorder(),
             filled: true,

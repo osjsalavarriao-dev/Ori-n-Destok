@@ -33,7 +33,6 @@ class EdgeController extends ChangeNotifier {
   int pending = 0;
   List<Telemetry> telemetry = [];
   List<Map<String, dynamic>> alerts = [], wellbeing = [];
-  final List<Map<String, String>> messages = [];
 
   /// Última medición puntual de cada métrica.
   Map<String, Measurement> measurements = {};
@@ -127,6 +126,12 @@ class EdgeController extends ChangeNotifier {
   HealthStatus get overallStatus => worstOf([
     ...indicators.map((i) => statusOf(i.id)),
     ...bodyRegions.map(symptomStatus),
+  ]);
+
+  HealthStatus get assistantStatus => worstOf([
+    overallStatus,
+    for (final alert in alerts.where((a) => a['atendida'] == 0))
+      alert['nivel_severidad'] == 'CRITICAL' ? HealthStatus.critical : HealthStatus.watch,
   ]);
 
   /// Señal de salud de un peligro: peor estado de sus indicadores.
@@ -310,7 +315,6 @@ class EdgeController extends ChangeNotifier {
     _demoToday.clear();
     symptoms.clear();
     checkedRegions.clear();
-    messages.clear();
     pending = 0;
     offline = false;
     error = null;
@@ -399,21 +403,6 @@ class EdgeController extends ChangeNotifier {
     },
     trends: true,
   );
-
-  void sendDemoMessage(String text, AppLanguage language) {
-    if (!demo || offline || text.trim().isEmpty) return;
-    final bpm = latest?.bpm ?? '—';
-    final spo2 = latest?.spo2.toStringAsFixed(1) ?? '—';
-    messages.add({'role': 'user', 'text': text.trim()});
-    messages.add({
-      'role': 'orbi',
-      'text': T(
-        'Respuesta de demostración: la última lectura simulada es $bpm BPM y $spo2% SpO₂. Gemini aún no está conectado. No se ha realizado una evaluación médica.',
-        'Demo reply: the latest simulated reading is $bpm BPM and $spo2% SpO₂. Gemini is not connected yet. No medical assessment has been made.',
-      ).of(language),
-    });
-    _emit();
-  }
 
   /// Texto de una alerta en el idioma pedido, a partir de su métrica y nivel.
   /// Las alertas del backend guardan además un texto en español en SQLite.

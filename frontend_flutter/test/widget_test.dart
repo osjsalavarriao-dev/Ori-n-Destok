@@ -8,12 +8,17 @@ import 'package:horion_edge/screens/risks_screen.dart';
 import 'package:horion_edge/models/telemetry.dart';
 import 'package:horion_edge/screens/trends_screen.dart';
 
-Future<void> _open(WidgetTester tester, {Size size = const Size(1440, 1000)}) async {
+Future<void> _open(
+  WidgetTester tester, {
+  Size size = const Size(1440, 1400),
+}) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(const HorionApp(language: AppLanguage.es));
+  await tester.tap(find.byIcon(Icons.motion_photos_on));
+  await tester.pump();
   await tester.pump();
 }
 
@@ -21,11 +26,13 @@ void main() {
   testWidgets('Navegación, alerta y bienestar funcionan en demo', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(1440, 1000);
+    tester.view.physicalSize = const Size(1440, 1400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(const HorionApp(language: AppLanguage.es));
+    await tester.tap(find.byIcon(Icons.motion_photos_on));
+    await tester.pump();
     await tester.pump();
     expect(find.text('DEMO · DATOS SIMULADOS'), findsOneWidget);
     await tester.tap(find.text('Simular anomalía'));
@@ -48,11 +55,13 @@ void main() {
   });
 
   testWidgets('Mapa corporal y ficha educativa de indicador', (tester) async {
-    tester.view.physicalSize = const Size(1440, 1000);
+    tester.view.physicalSize = const Size(1440, 1400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(const HorionApp(language: AppLanguage.es));
+    await tester.tap(find.byIcon(Icons.motion_photos_on));
+    await tester.pump();
     await tester.pump();
     await tester.tap(find.text('Glucosa en sangre'));
     await tester.pumpAndSettle();
@@ -84,7 +93,15 @@ void main() {
     final hrv = indicator('hrv');
     DailyPoint day(int d, double? v) =>
         DailyPoint(DateTime.utc(2026, 1, d), {'hrv': ?v});
-    final all = [day(1, 50), day(2, 52), day(3, 54), day(4, null), day(5, 40), day(6, 42), day(7, 44)];
+    final all = [
+      day(1, 50),
+      day(2, 52),
+      day(3, 54),
+      day(4, null),
+      day(5, 40),
+      day(6, 42),
+      day(7, 44),
+    ];
     expect(BaselineComparison.of(hrv, all.take(4).toList(), all), isNull);
     final cmp = BaselineComparison.of(hrv, all, all.skip(4).toList())!;
     expect(cmp.baseline, 52);
@@ -94,7 +111,9 @@ void main() {
     expect(cmp.daysOutOfRange, 0); // 40–44 ms sigue en el rango normal.
   });
 
-  testWidgets('Tendencias con historial demo, entorno y medición manual', (tester) async {
+  testWidgets('Tendencias con historial demo, entorno y medición manual', (
+    tester,
+  ) async {
     await _open(tester);
     await tester.tap(find.text('Tendencias').first);
     await tester.pumpAndSettle();
@@ -103,7 +122,10 @@ void main() {
       find.text('Resumen frente a tu línea base'),
       400,
       scrollable: find
-          .descendant(of: find.byType(TrendsScreen), matching: find.byType(Scrollable))
+          .descendant(
+            of: find.byType(TrendsScreen),
+            matching: find.byType(Scrollable),
+          )
           .first,
     );
     expect(find.text('Resumen frente a tu línea base'), findsOneWidget);
@@ -112,7 +134,10 @@ void main() {
 
     await tester.tap(find.text('Riesgos y entorno').first);
     await tester.pumpAndSettle();
-    expect(find.textContaining('Estación espacial (órbita baja) · Día 14'), findsOneWidget);
+    expect(
+      find.textContaining('Estación espacial (órbita baja) · Día 14'),
+      findsOneWidget,
+    );
     await tester.tap(find.widgetWithText(ChoiceChip, 'Base marciana'));
     await tester.pumpAndSettle();
     expect(find.text('4–24 min (solo de ida)'), findsOneWidget);
@@ -124,12 +149,33 @@ void main() {
     await tester.tap(find.text('Registrar medición'));
     await tester.pumpAndSettle();
     // Presión imposible: la sistólica no puede ser menor que la diastólica.
-    await tester.enterText(find.byKey(const ValueKey('measure-presion_sistolica')), '80');
-    await tester.enterText(find.byKey(const ValueKey('measure-presion_diastolica')), '90');
+    await tester.enterText(
+      find.byKey(const ValueKey('measure-presion_sistolica')),
+      '80',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('measure-presion_diastolica')),
+      '90',
+    );
     await tester.pump();
-    expect(find.text('La sistólica debe ser mayor que la diastólica.'), findsOneWidget);
-    expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Guardar')).onPressed, isNull);
-    await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Glucosa')).first);
+    expect(
+      find.text('La sistólica debe ser mayor que la diastólica.'),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Guardar'))
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(AlertDialog),
+            matching: find.text('Glucosa'),
+          )
+          .first,
+    );
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('measure-glucosa')), '50');
     await tester.pump();
@@ -138,7 +184,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Medición registrada.'), findsOneWidget);
     expect(find.text('50'), findsOneWidget); // Tarjeta de glucosa.
-    expect(find.textContaining('ALERTA CRÍTICA · GLUCOSA EN SANGRE'), findsOneWidget);
+    expect(
+      find.textContaining('ALERTA CRÍTICA · GLUCOSA EN SANGRE'),
+      findsOneWidget,
+    );
     // En Marte la alerta crítica recuerda actuar sin esperar a Tierra.
     expect(find.textContaining('Base marciana: Tierra tarda'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -161,10 +210,15 @@ void main() {
     for (final s in researchStudies) {
       expect(regionIds, containsAll(s.regionIds), reason: s.name);
     }
-    expect(researchFor('eyes').map((s) => s.name), containsAll(['Thigh Cuff', 'B-Complex']));
+    expect(
+      researchFor('eyes').map((s) => s.name),
+      containsAll(['Thigh Cuff', 'B-Complex']),
+    );
   });
 
-  testWidgets('Autoevaluación de SANS: mapa corporal y riesgo HRP', (tester) async {
+  testWidgets('Autoevaluación de SANS: mapa corporal y riesgo HRP', (
+    tester,
+  ) async {
     await _open(tester);
     await tester.tap(find.text('Mapa corporal').first);
     await tester.pump(const Duration(milliseconds: 500));
@@ -177,28 +231,52 @@ void main() {
     expect(find.text('Estado: Vigilar'), findsOneWidget);
     expect(find.textContaining('Visión de cerca borrosa'), findsOneWidget);
     // Una zona sin síntomas confirmados pasa a normal.
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Oído interno y equilibrio'));
+    await tester.tap(
+      find.widgetWithText(ChoiceChip, 'Oído interno y equilibrio'),
+    );
     await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.text('No tengo ninguno'));
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('Estado: Normal'), findsOneWidget);
-    expect(find.textContaining('problemas de equilibrio'), findsOneWidget); // Beneficio en la Tierra.
+    expect(
+      find.textContaining('problemas de equilibrio'),
+      findsOneWidget,
+    ); // Beneficio en la Tierra.
 
     await tester.tap(find.text('Riesgos y entorno').first);
     await tester.pumpAndSettle();
     final list = find
-        .descendant(of: find.byType(RisksScreen), matching: find.byType(Scrollable))
+        .descendant(
+          of: find.byType(RisksScreen),
+          matching: find.byType(Scrollable),
+        )
         .first;
-    await tester.scrollUntilVisible(find.text('Los 5 peligros del vuelo espacial'), 400, scrollable: list);
+    await tester.scrollUntilVisible(
+      find.text('Los 5 peligros del vuelo espacial'),
+      400,
+      scrollable: list,
+    );
     expect(find.text('Los 5 peligros del vuelo espacial'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Síndrome neuro-ocular (SANS)'), 400, scrollable: list);
+    await tester.scrollUntilVisible(
+      find.text('Síndrome neuro-ocular (SANS)'),
+      400,
+      scrollable: list,
+    );
     expect(find.text('Vigilado · Vigilar'), findsWidgets);
-    await tester.drag(list, const Offset(0, -300)); // Deja espacio para el contenido expandido.
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Síndrome neuro-ocular (SANS)'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Síndrome neuro-ocular (SANS)'));
     await tester.pumpAndSettle();
-    expect(find.text('Risk of Spaceflight Associated Neuro-ocular Syndrome (SANS)'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Cáncer inducido por radiación'), 400, scrollable: list);
+    expect(
+      find.text('Risk of Spaceflight Associated Neuro-ocular Syndrome (SANS)'),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Cáncer inducido por radiación'),
+      400,
+      scrollable: list,
+    );
     expect(find.text('Informativo'), findsWidgets);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -210,7 +288,9 @@ void main() {
     expect(() => '$text', throwsA(isA<AssertionError>()));
   });
 
-  testWidgets('Cambiar a inglés traduce todas las pantallas en vivo', (tester) async {
+  testWidgets('Cambiar a inglés traduce todas las pantallas en vivo', (
+    tester,
+  ) async {
     await _open(tester);
     expect(find.text('Monitor vital'), findsWidgets);
     await tester.tap(find.byIcon(Icons.translate));
@@ -221,7 +301,10 @@ void main() {
     expect(find.text('Vital monitor'), findsWidgets);
     expect(find.text('Monitor vital'), findsNothing);
     expect(find.text('Log measurement'), findsOneWidget);
-    expect(find.textContaining('Space station (low Earth orbit) · Day 14'), findsOneWidget);
+    expect(
+      find.textContaining('Space station (low Earth orbit) · Day 14'),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Blood glucose'));
     await tester.pumpAndSettle();
@@ -237,8 +320,14 @@ void main() {
 
     await tester.tap(find.text('Simulate anomaly'));
     await tester.pump();
-    expect(find.text('CRITICAL ALERT · OXYGEN SATURATION · SIMULATION'), findsOneWidget);
-    expect(find.textContaining('Oxygen saturation in the critical range.'), findsOneWidget);
+    expect(
+      find.text('CRITICAL ALERT · OXYGEN SATURATION · SIMULATION'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Oxygen saturation in the critical range.'),
+      findsOneWidget,
+    );
     expect(find.text('Overall status: Critical'), findsOneWidget);
 
     await tester.tap(find.text('Body map').first);
@@ -262,7 +351,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Show my vital signs'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Demo reply:'), findsOneWidget);
+    expect(find.textContaining('Local guidance'), findsOneWidget);
 
     await tester.tap(find.text('History & sync').first);
     await tester.pumpAndSettle();
@@ -287,15 +376,20 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(const HorionApp(language: AppLanguage.es));
+    await tester.tap(find.byIcon(Icons.motion_photos_on));
+    await tester.pump();
     await tester.pump();
     await tester.tap(find.byIcon(Icons.auto_awesome_outlined));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Ver mis signos vitales'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Respuesta de demostración:'), findsOneWidget);
+    expect(find.textContaining('Consulta local'), findsWidgets);
     await tester.tap(find.byType(Switch).at(1));
     await tester.pumpAndSettle();
-    expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
+    expect(find.byType(TextField), findsNothing);
+    await tester.tap(find.text('Estado del monitoreo'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Consulta local'), findsWidgets);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });

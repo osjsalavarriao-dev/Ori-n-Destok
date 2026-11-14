@@ -53,8 +53,7 @@ class _BodyMapScreenState extends State<BodyMapScreen>
 
   void _syncTicker() {
     // Respeta la preferencia del sistema de reducir animaciones.
-    final animate =
-        widget.visible && !MediaQuery.of(context).disableAnimations;
+    final animate = widget.visible && !MediaQuery.of(context).disableAnimations;
     if (animate && !_ticker.isActive) _ticker.start();
     if (!animate && _ticker.isActive) _ticker.stop();
   }
@@ -119,13 +118,17 @@ class _BodyMapScreenState extends State<BodyMapScreen>
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(width: 340, height: 600, child: figure),
+                  SizedBox(
+                    width: 280,
+                    height: 440,
+                    child: RepaintBoundary(child: figure),
+                  ),
                   const SizedBox(width: 24),
                   Expanded(child: panel),
                 ],
               )
             else ...[
-              SizedBox(height: 420, child: figure),
+              SizedBox(height: 320, child: RepaintBoundary(child: figure)),
               const SizedBox(height: 20),
               panel,
             ],
@@ -227,7 +230,12 @@ class _BodyGeometry {
     return Path()
       ..addOval(Rect.fromCircle(center: _p(100, 40), radius: 28 * scale))
       ..addRRect(RRect.fromRectAndRadius(_r(89, 64, 111, 86), radius))
-      ..addRRect(RRect.fromRectAndRadius(_r(58, 82, 142, 236), Radius.circular(26 * scale)))
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          _r(58, 82, 142, 236),
+          Radius.circular(26 * scale),
+        ),
+      )
       ..addRRect(RRect.fromRectAndRadius(_r(30, 90, 56, 250), radius))
       ..addRRect(RRect.fromRectAndRadius(_r(144, 90, 170, 250), radius))
       ..addRRect(RRect.fromRectAndRadius(_r(62, 226, 98, 428), radius))
@@ -241,22 +249,76 @@ class _BodyGeometry {
     return {
       'heart': _heart(_p(108, 140), 15 * scale * heartScale),
       'eyes': Path()
-        ..addOval(Rect.fromCenter(center: _p(89, 46), width: 14 * scale, height: 8 * scale))
-        ..addOval(Rect.fromCenter(center: _p(111, 46), width: 14 * scale, height: 8 * scale)),
+        ..addOval(
+          Rect.fromCenter(
+            center: _p(89, 46),
+            width: 14 * scale,
+            height: 8 * scale,
+          ),
+        )
+        ..addOval(
+          Rect.fromCenter(
+            center: _p(111, 46),
+            width: 14 * scale,
+            height: 8 * scale,
+          ),
+        ),
       'vestibular': Path()
-        ..addOval(Rect.fromCenter(center: _p(72, 40), width: 9 * scale, height: 15 * scale))
-        ..addOval(Rect.fromCenter(center: _p(128, 40), width: 9 * scale, height: 15 * scale)),
+        ..addOval(
+          Rect.fromCenter(
+            center: _p(72, 40),
+            width: 9 * scale,
+            height: 15 * scale,
+          ),
+        )
+        ..addOval(
+          Rect.fromCenter(
+            center: _p(128, 40),
+            width: 9 * scale,
+            height: 15 * scale,
+          ),
+        ),
       'brain': Path()
-        ..addOval(Rect.fromCenter(center: _p(100, 34), width: 42 * scale, height: 30 * scale)),
+        ..addOval(
+          Rect.fromCenter(
+            center: _p(100, 34),
+            width: 42 * scale,
+            height: 30 * scale,
+          ),
+        ),
       'lungs': Path()
-        ..addOval(Rect.fromCenter(center: _p(81, 130), width: 28 * scale, height: 56 * scale))
-        ..addOval(Rect.fromCenter(center: _p(119, 130), width: 28 * scale, height: 56 * scale)),
+        ..addOval(
+          Rect.fromCenter(
+            center: _p(81, 130),
+            width: 28 * scale,
+            height: 56 * scale,
+          ),
+        )
+        ..addOval(
+          Rect.fromCenter(
+            center: _p(119, 130),
+            width: 28 * scale,
+            height: 56 * scale,
+          ),
+        ),
       'metabolism': Path()
-        ..addOval(Rect.fromCenter(center: _p(100, 196), width: 60 * scale, height: 36 * scale)),
+        ..addOval(
+          Rect.fromCenter(
+            center: _p(100, 196),
+            width: 60 * scale,
+            height: 36 * scale,
+          ),
+        ),
       'immune': Path()
         ..addRRect(RRect.fromRectAndRadius(_r(34, 104, 52, 238), radius))
         ..addRRect(RRect.fromRectAndRadius(_r(148, 104, 166, 238), radius))
-        ..addOval(Rect.fromCenter(center: _p(100, 76), width: 18 * scale, height: 12 * scale)),
+        ..addOval(
+          Rect.fromCenter(
+            center: _p(100, 76),
+            width: 18 * scale,
+            height: 12 * scale,
+          ),
+        ),
       'bones': Path()
         ..addRRect(RRect.fromRectAndRadius(_r(70, 246, 90, 416), radius))
         ..addRRect(RRect.fromRectAndRadius(_r(110, 246, 130, 416), radius)),
@@ -266,8 +328,22 @@ class _BodyGeometry {
   /// Corazón de ancho ≈ 2·s centrado en c.
   static Path _heart(Offset c, double s) => Path()
     ..moveTo(c.dx, c.dy + s)
-    ..cubicTo(c.dx - s * 1.4, c.dy, c.dx - s * .9, c.dy - s * 1.1, c.dx, c.dy - s * .45)
-    ..cubicTo(c.dx + s * .9, c.dy - s * 1.1, c.dx + s * 1.4, c.dy, c.dx, c.dy + s)
+    ..cubicTo(
+      c.dx - s * 1.4,
+      c.dy,
+      c.dx - s * .9,
+      c.dy - s * 1.1,
+      c.dx,
+      c.dy - s * .45,
+    )
+    ..cubicTo(
+      c.dx + s * .9,
+      c.dy - s * 1.1,
+      c.dx + s * 1.4,
+      c.dy,
+      c.dx,
+      c.dy + s,
+    )
     ..close();
 
   String? hitTest(Offset position) {
@@ -325,13 +401,18 @@ class _BodyPainter extends CustomPainter {
       };
       final path = regions[id]!;
       final color = status.color;
+      if (id == selected || status == HealthStatus.critical) {
+        canvas.drawPath(
+          path,
+          Paint()
+            ..color = color.withValues(alpha: .12 + .15 * pulse)
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, 3 * g.scale),
+        );
+      }
       canvas.drawPath(
         path,
-        Paint()
-          ..color = color.withValues(alpha: .25 + .35 * pulse)
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, 6 * g.scale),
+        Paint()..color = color.withValues(alpha: .35 + .25 * pulse),
       );
-      canvas.drawPath(path, Paint()..color = color.withValues(alpha: .35 + .25 * pulse));
       // Contorno oscuro para separar zonas superpuestas (corazón sobre pulmones).
       canvas.drawPath(
         path,
@@ -374,12 +455,16 @@ class _RegionPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(context.t(region.name), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600)),
+            Text(
+              context.t(region.name),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 12),
             if (hasSensors || (hasCheck && status != HealthStatus.unknown))
               StatusBanner(
                 status: status,
-                text: '${context.tr('Estado', 'Status')}: ${context.t(status.label)}',
+                text:
+                    '${context.tr('Estado', 'Status')}: ${context.t(status.label)}',
               )
             else if (hasCheck)
               StatusBanner(
@@ -392,10 +477,16 @@ class _RegionPanel extends StatelessWidget {
             else
               StatusBanner(
                 status: HealthStatus.unknown,
-                text: context.tr('Sin sensor directo a bordo', 'No direct sensor on board'),
+                text: context.tr(
+                  'Sin sensor directo a bordo',
+                  'No direct sensor on board',
+                ),
               ),
             if (hasCheck) _SymptomCheck(controller: controller, region: region),
-            _section(context.tr('Función', 'Function'), context.t(region.function)),
+            _section(
+              context.tr('Función', 'Function'),
+              context.t(region.function),
+            ),
             _section(
               context.tr('Efecto del vuelo espacial', 'Effect of spaceflight'),
               context.t(region.spaceEffect),
@@ -435,7 +526,10 @@ class _RegionPanel extends StatelessWidget {
             if (research.isNotEmpty) ...[
               const SizedBox(height: 18),
               Text(
-                context.tr('Investigación de NASA relacionada', 'Related NASA research'),
+                context.tr(
+                  'Investigación de NASA relacionada',
+                  'Related NASA research',
+                ),
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               Text(
@@ -451,7 +545,11 @@ class _RegionPanel extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.science_outlined, size: 18, color: Color(0xFFA99AFB)),
+                      const Icon(
+                        Icons.science_outlined,
+                        size: 18,
+                        color: Color(0xFFA99AFB),
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
@@ -459,11 +557,16 @@ class _RegionPanel extends StatelessWidget {
                           children: [
                             Text(
                               '${s.name} · ${context.t(s.status.label)}',
-                              style: const TextStyle(fontWeight: FontWeight.w600),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             Text(
                               context.t(s.description),
-                              style: const TextStyle(color: Colors.white70, height: 1.4),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                height: 1.4,
+                              ),
                             ),
                           ],
                         ),
@@ -558,7 +661,8 @@ class _SymptomCheck extends StatelessWidget {
               contentPadding: EdgeInsets.zero,
               controlAffinity: ListTileControlAffinity.leading,
               value: active.contains(s.id),
-              onChanged: (v) => controller.setSymptom(region.id, s.id, v ?? false),
+              onChanged: (v) =>
+                  controller.setSymptom(region.id, s.id, v ?? false),
               title: Text(context.t(s.question)),
             ),
           if (active.isEmpty)
@@ -566,10 +670,16 @@ class _SymptomCheck extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: OutlinedButton.icon(
                 onPressed: () => controller.confirmNoSymptoms(region.id),
-                icon: Icon(checked ? Icons.check : Icons.check_circle_outline, size: 18),
+                icon: Icon(
+                  checked ? Icons.check : Icons.check_circle_outline,
+                  size: 18,
+                ),
                 label: Text(
                   checked
-                      ? context.tr('Sin síntomas registrados', 'No symptoms recorded')
+                      ? context.tr(
+                          'Sin síntomas registrados',
+                          'No symptoms recorded',
+                        )
                       : context.tr('No tengo ninguno', 'I have none of these'),
                 ),
               ),

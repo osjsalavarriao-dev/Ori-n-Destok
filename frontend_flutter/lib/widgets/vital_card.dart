@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../l10n/language.dart';
+import 'telemetry_motion.dart';
 import '../models/health_knowledge.dart';
 
 class VitalCard extends StatelessWidget {
@@ -13,8 +14,10 @@ class VitalCard extends StatelessWidget {
     this.color = const Color(0xFF38BDF8),
     this.status = HealthStatus.unknown,
     this.onTap,
+    this.metric = '',
   });
   final String label, value, unit;
+  final String metric;
   final IconData icon;
   final Color color;
   final HealthStatus status;
@@ -23,10 +26,15 @@ class VitalCard extends StatelessWidget {
   Widget build(BuildContext context) => AnimatedContainer(
     duration: const Duration(milliseconds: 400),
     decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       border: Border.all(color: status.color.withValues(alpha: .6), width: 1.5),
       boxShadow: status == HealthStatus.critical
-          ? [BoxShadow(color: status.color.withValues(alpha: .35), blurRadius: 16)]
+          ? [
+              BoxShadow(
+                color: status.color.withValues(alpha: .35),
+                blurRadius: 16,
+              ),
+            ]
           : null,
     ),
     child: Card(
@@ -35,13 +43,18 @@ class VitalCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(icon, color: color, size: 20),
+                  TelemetryMotion(
+                    metric: metric,
+                    value: double.tryParse(value),
+                    status: status,
+                    child: Icon(icon, color: color, size: 22),
+                  ),
                   const SizedBox(width: 8),
                   Expanded(child: Text(label)),
                   Tooltip(
@@ -50,11 +63,11 @@ class VitalCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 8),
               Text(
                 value,
                 style: TextStyle(
-                  fontSize: 34,
+                  fontSize: 30,
                   fontWeight: FontWeight.w600,
                   fontFamily: 'Consolas',
                   color: color,
@@ -65,14 +78,14 @@ class VitalCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       unit,
-                      style: const TextStyle(color: Colors.white54),
+                      style: const TextStyle(color: Color(0xFFA9BDCA)),
                     ),
                   ),
                   Text(
                     context.t(status.label).toUpperCase(),
                     style: TextStyle(
                       color: status.color,
-                      fontSize: 11,
+                      fontSize: 12,
                       letterSpacing: 1,
                       fontWeight: FontWeight.w600,
                     ),

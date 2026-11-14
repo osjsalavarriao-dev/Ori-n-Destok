@@ -6,6 +6,8 @@ import '../services/edge_controller.dart';
 import '../widgets/indicator_detail.dart';
 import '../widgets/measurement_dialog.dart';
 import '../widgets/vital_card.dart';
+import '../widgets/orbin_avatar.dart';
+import '../widgets/telemetry_motion.dart';
 import '../widgets/telemetry_chart.dart';
 
 class VitalMonitorScreen extends StatelessWidget {
@@ -35,6 +37,7 @@ class VitalMonitorScreen extends StatelessWidget {
     final value = controller.displayValue(id);
     final status = controller.displayStatus(id);
     return VitalCard(
+      metric: id,
       label: context.t(ind.name),
       value: value,
       unit: context.t(ind.unit),
@@ -69,22 +72,29 @@ class VitalMonitorScreen extends StatelessWidget {
                 Text(
                   context.tr(
                     'Tu estado a bordo, de un vistazo. Toca un indicador para saber qué mide y qué hacer.',
-                    'Your health on board at a glance. Tap an indicator to learn what it measures and what to do.',
+                    'Check your status first. Then explore your indicators or record how you feel.',
                   ),
-                  style: const TextStyle(color: Colors.white60),
+                  style: const TextStyle(color: Color(0xFFA9BDCA)),
                 ),
               ],
             ),
             FilledButton.icon(
-              onPressed: controller.busy || (!controller.demo && !controller.connected)
+              onPressed:
+                  controller.busy || (!controller.demo && !controller.connected)
                   ? null
                   : () async {
-                      final saved = await showMeasurementDialog(context, controller);
+                      final saved = await showMeasurementDialog(
+                        context,
+                        controller,
+                      );
                       if (saved == true && context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              context.tr('Medición registrada.', 'Measurement saved.'),
+                              context.tr(
+                                'Medición registrada.',
+                                'Measurement saved.',
+                              ),
                             ),
                           ),
                         );
@@ -95,15 +105,15 @@ class VitalMonitorScreen extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
         Card(
           child: InkWell(
             onTap: openBodyMap,
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
-                  Icon(overall.icon, color: overall.color, size: 40),
+                  OrbinAvatar(size: 64, status: overall, onTap: openOrbi),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -152,52 +162,76 @@ class VitalMonitorScreen extends StatelessWidget {
             );
           },
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
         Card(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.tr('Frecuencia cardíaca · BPM', 'Heart rate · BPM'),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  context.tr(
-                    '${controller.telemetry.length} lecturas · hasta 30 minutos · escala automática',
-                    '${controller.telemetry.length} readings · up to 30 minutes · auto scale',
-                  ),
-                  style: const TextStyle(color: Colors.white54),
-                ),
-                const SizedBox(height: 20),
-                TelemetryChart(samples: controller.telemetry),
-                if (t != null)
-                  Text(
-                    '${context.tr('Última lectura', 'Last reading')}: ${t.time.toLocal().toString().substring(11, 19)}',
-                    style: const TextStyle(color: Colors.white54),
-                  ),
-              ],
+          child: ExpansionTile(
+            title: Text(
+              context.tr('Ver historial de pulso', 'View pulse history'),
             ),
+            leading: const Icon(Icons.show_chart),
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.tr(
+                        'Frecuencia cardíaca · BPM',
+                        'Heart rate · BPM',
+                      ),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      context.tr(
+                        '${controller.telemetry.length} lecturas · hasta 30 minutos · escala automática',
+                        '${controller.telemetry.length} readings · up to 30 minutes · auto scale',
+                      ),
+                      style: const TextStyle(color: Color(0xFFA9BDCA)),
+                    ),
+                    const SizedBox(height: 12),
+                    if (t != null) ...[
+                      RhythmTrace(bpm: t.bpm, color: overall.color),
+                      Text(
+                        context.tr(
+                          'Ritmo ilustrativo / no es un ECG medido',
+                          'Illustrative rhythm / not a measured ECG',
+                        ),
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    TelemetryChart(samples: controller.telemetry),
+                    if (t != null)
+                      Text(
+                        '${context.tr('Última lectura', 'Last reading')}: ${t.time.toLocal().toString().substring(11, 19)}',
+                        style: const TextStyle(color: Color(0xFFA9BDCA)),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
         Card(
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(14),
             child: Wrap(
               spacing: 24,
               runSpacing: 12,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const Icon(
-                  Icons.blur_circular,
-                  color: Color(0xFF38BDF8),
-                  size: 40,
-                ),
+                OrbinAvatar(size: 64, status: overall, onTap: openOrbi),
                 Text(
-                  context.tr('Orbi, tu compañero a bordo', 'Orbi, your companion on board'),
+                  context.tr(
+                    'Orbi, tu compañero a bordo',
+                    'Orbi, your companion on board',
+                  ),
                   style: const TextStyle(fontSize: 18),
                 ),
                 FilledButton(
@@ -228,7 +262,7 @@ class VitalMonitorScreen extends StatelessWidget {
     return Card(
       color: critical ? const Color(0xFF40222B) : const Color(0xFF3A3420),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -236,7 +270,9 @@ class VitalMonitorScreen extends StatelessWidget {
               children: [
                 Icon(status.icon, color: status.color, size: 18),
                 const SizedBox(width: 8),
-                Expanded(child: Text(title, style: TextStyle(color: status.color))),
+                Expanded(
+                  child: Text(title, style: TextStyle(color: status.color)),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -244,14 +280,17 @@ class VitalMonitorScreen extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               context.t(status.escalation),
-              style: const TextStyle(color: Colors.white60, fontSize: 13),
+              style: const TextStyle(color: Color(0xFFA9BDCA), fontSize: 13),
             ),
             if (critical && env.escalationNote != null)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
                   '${context.t(env.name)}: ${context.t(env.escalationNote!)}',
-                  style: const TextStyle(color: Colors.white60, fontSize: 13),
+                  style: const TextStyle(
+                    color: Color(0xFFA9BDCA),
+                    fontSize: 13,
+                  ),
                 ),
               ),
             const SizedBox(height: 12),
@@ -259,7 +298,9 @@ class VitalMonitorScreen extends StatelessWidget {
               onPressed: controller.busy
                   ? null
                   : () => controller.acknowledge(alert['id'] as int),
-              child: Text(context.tr('Marcar como atendida', 'Mark as handled')),
+              child: Text(
+                context.tr('Marcar como atendida', 'Mark as handled'),
+              ),
             ),
           ],
         ),
