@@ -42,7 +42,12 @@ class OrbiChatTests(unittest.TestCase):
         messages = complete.call_args.args[0]
         self.assertEqual(messages[0]['role'], 'system')
         self.assertIn('Variabilidad cardíaca', messages[1]['content'])
-        self.assertEqual(messages[2], {'role': 'assistant', 'content': 'Hola'})
+        # El historial de la base va en su propio mensaje de sistema, antes de
+        # los turnos de la sesión actual.
+        self.assertEqual(messages[2]['role'], 'system')
+        self.assertIn('HISTORIAL DE LA BASE DE DATOS', messages[2]['content'])
+        self.assertIn('historial_diario', messages[2]['content'])
+        self.assertEqual(messages[3], {'role': 'assistant', 'content': 'Hola'})
         self.assertEqual(messages[-1], {'role': 'user', 'content': '¿Cómo estoy?'})
         with database.connection() as db:
             rows = database.rows(db, 'SELECT rol, mensaje, contexto_biometrico_json FROM chat_historial ORDER BY id')

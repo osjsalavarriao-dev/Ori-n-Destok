@@ -2,7 +2,6 @@ import 'dart:io';
 
 import '../l10n/language.dart';
 import '../models/health_knowledge.dart';
-import '../models/telemetry.dart';
 import 'api_service.dart';
 import 'edge_controller.dart';
 
@@ -109,25 +108,14 @@ class OrbiAssistant {
   }
 
   /// Instantánea de lo que ve el tripulante: valores, estados, alertas,
-  /// bienestar, tendencias, síntomas y entorno. Sin nombre ni identificadores.
+  /// bienestar, tendencias día a día, síntomas y entorno. Sin nombre ni
+  /// identificadores.
   static Map<String, dynamic> buildContext(
     EdgeController c,
     AppLanguage language,
   ) {
     String t(T text) => text.of(language);
     final days = c.history;
-    final past = days.length > 1
-        ? days.sublist(0, days.length - 1).reversed.take(14).toList()
-        : <DailyPoint>[];
-    final recent = days.reversed.take(3).toList();
-    double? average(List<DailyPoint> points, String id) {
-      final values = points.map((p) => p.values[id]).whereType<double>();
-      if (values.isEmpty) return null;
-      final mean = values.reduce((a, b) => a + b) / values.length;
-      return double.parse(mean.toStringAsFixed(1));
-    }
-
-    final metricIds = {for (final day in days) ...day.values.keys};
     return {
       'datos_simulados': c.demo,
       'entorno': t(c.environment.name),
@@ -155,7 +143,7 @@ class OrbiAssistant {
           },
       ],
       'bienestar_reciente': [
-        for (final entry in c.wellbeing.take(3))
+        for (final entry in c.wellbeing.take(5))
           {
             for (final key in [
               'timestamp_utc',
@@ -167,13 +155,17 @@ class OrbiAssistant {
               if (entry[key] != null) key: entry[key],
           },
       ],
-      'tendencias': {
-        for (final id in metricIds)
-          id: {
-            'promedio_dias_anteriores': average(past, id),
-            'ultimos_3_dias': average(recent, id),
+      // Historial día a día para que Orbi compare fechas concretas.
+      'historial_por_dia': [
+        for (final day in days.reversed.take(14))
+          {
+            'fecha': '${day.date.year}-${day.date.month.toString().padLeft(2, '0')}-${day.date.day.toString().padLeft(2, '0')}',
+            'valores': {
+              for (final entry in day.values.entries)
+                entry.key: double.parse(entry.value.toStringAsFixed(1)),
+            },
           },
-      },
+      ],
       'sintomas_marcados': [
         for (final region in bodyRegions)
           if (c.symptoms[region.id]?.isNotEmpty ?? false)

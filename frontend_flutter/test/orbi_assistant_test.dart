@@ -20,7 +20,11 @@ void main() {
       (indicators.first as Map).keys,
       containsAll(['nombre', 'valor', 'unidad', 'estado']),
     );
-    expect(context['tendencias'], isNotEmpty);
+    // Historial día a día (como mucho 14 días) para comparar fechas.
+    final days = context['historial_por_dia'] as List;
+    expect(days, isNotEmpty);
+    expect(days.length, lessThanOrEqualTo(14));
+    expect((days.first as Map).keys, containsAll(['fecha', 'valores']));
     // El backend rechaza contextos de más de 20 000 caracteres.
     expect(json.length, lessThan(20000));
     // Ni nombre ni códigos del tripulante o la misión.

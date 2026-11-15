@@ -235,6 +235,63 @@ def symptoms(body: SymptomCheckRequest):
 
 # --- Orbi en línea (Groq) ---------------------------------------------------
 
+def _enrich_context(context):
+    """Añade historial de la base de datos al contexto de la app para que Orbi
+    pueda comparar días, recordar síntomas pasados y dar respuestas contextuales."""
+    since = (datetime.now(timezone.utc) - timedelta(days=14)).isoformat()
+    with database.connection() as db:
+        # Promedios diarios de telemetría (últimos 14 días).
+        averages = ', '.join(f'ROUND(AVG({m}), 1) AS {m}' for m in TELEMETRY_METRICS)
+        daily = database.rows(db, f'''SELECT substr(timestamp_utc, 1, 10) AS fecha, {averages}
+            FROM telemetria WHERE timestamp_utc >= ? GROUP BY fecha ORDER BY fecha''', (since,))
+
+        # Bienestar diario: fusiona con la telemetría por fecha.
+        for row in db.execute('''SELECT substr(timestamp_utc, 1, 10) AS fecha,
+                ROUND(AVG(horas_sueno), 1) AS horas_sueno, CAST(ROUND(AVG(agua_ml)) AS INTEGER) AS agua_ml,
+                ROUND(AVG(energia), 1) AS energia, ROUND(AVG(animo), 1) AS animo
+            FROM bienestar WHERE timestamp_utc >= ? GROUP BY fecha ORDER BY fecha''', (since,)):
+            day = next((d for d in daily if d['fecha'] == row['fecha']), None)
+            if day is None:
+                day = {'fecha': row['fecha']}
+                daily.append(day)
+                daily.sort(key=lambda d: d['fecha'])
+            for key in ('horas_sueno', 'agua_ml', 'energia', 'animo'):
+                if row[key] is not None:
+                    day[key] = row[key]
+
+        # Alertas recientes (últimas 20) con fecha legible.
+        alerts_hist = database.rows(db, '''SELECT substr(timestamp_utc, 1, 10) AS fecha,
+                nivel_severidad AS nivel, metrica_afectada AS metrica,
+                ROUND(valor_detectado, 1) AS valor, recomendacion_entregada AS accion, atendida
+            FROM alertas_medicas WHERE timestamp_utc >= ? ORDER BY timestamp_utc DESC LIMIT 20''', (since,))
+
+        # Autoevaluaciones de síntomas.
+        symptoms_hist = []
+        for row in db.execute('''SELECT substr(timestamp_utc, 1, 10) AS fecha, zona, sintomas_json
+                FROM autoevaluaciones WHERE timestamp_utc >= ? ORDER BY timestamp_utc DESC LIMIT 15''', (since,)):
+            symptoms_hist.append({'fecha': row['fecha'], 'zona': row['zona'],
+                                  'sintomas': json.loads(row['sintomas_json'])})
+
+        # Mediciones manuales (presión, glucosa, temperatura).
+        measurements_hist = database.rows(db, '''SELECT substr(timestamp_utc, 1, 10) AS fecha,
+                metrica, ROUND(valor, 1) AS valor
+            FROM mediciones WHERE timestamp_utc >= ? ORDER BY timestamp_utc DESC LIMIT 15''', (since,))
+
+        # Conversaciones anteriores guardadas (memoria entre sesiones).
+        past_chats = database.rows(db, '''SELECT substr(timestamp_utc, 1, 16) AS cuando, rol, mensaje
+            FROM chat_historial ORDER BY id DESC LIMIT 10''')
+
+    context['historial_diario'] = daily
+    if alerts_hist:
+        context['alertas_historicas'] = alerts_hist
+    if symptoms_hist:
+        context['sintomas_historicos'] = symptoms_hist
+    if measurements_hist:
+        context['mediciones_historicas'] = measurements_hist
+    if past_chats:
+        context['conversaciones_previas'] = list(reversed(past_chats))
+    return context
+
 class ChatTurn(BaseModel):
     rol: Literal['user', 'orbi']
     mensaje: str = Field(max_length=2000)
@@ -242,7 +299,7 @@ class ChatTurn(BaseModel):
 class OrbiChatRequest(BaseModel):
     mensaje: str = Field(min_length=1, max_length=1000)
     idioma: Literal['es', 'en'] = 'es'
-    historial: list[ChatTurn] = Field(default_factory=list, max_length=12)
+    historial: list[ChatTurn] = Field(default_factory=list, max_length=20)
     # Instantánea de lo que muestra la app (demo o backend): valores, estados,
     # alertas, bienestar, tendencias y entorno. Sin datos de identidad.
     contexto: dict = Field(default_factory=dict)
@@ -272,10 +329,11 @@ async def orbi_chat(body: OrbiChatRequest):
     (en los tres últimos `respuesta` es null y la app usa las consultas locales)."""
     if simulation['offline']:
         return dict(modo='SIN_CONEXION', respuesta=None)
-    reply = orbi_ai.critical_reply(body.contexto, body.idioma)
+    context = _enrich_context(dict(body.contexto))
+    reply = orbi_ai.critical_reply(context, body.idioma)
     mode = 'LOCAL_CRITICO'
     if reply is None:
-        messages = orbi_ai.build_messages(body.mensaje, [t.model_dump() for t in body.historial], body.contexto, body.idioma)
+        messages = orbi_ai.build_messages(body.mensaje, [t.model_dump() for t in body.historial], context, body.idioma)
         try:
             reply = await orbi_ai.complete(messages)
             mode = 'IA'

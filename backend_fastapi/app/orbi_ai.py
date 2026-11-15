@@ -52,23 +52,31 @@ def stt_model():
 
 
 SYSTEM_PROMPT = {
-    'es': """Eres Orbi, el asistente de salud de Horion Edge, una app de monitoreo biométrico para tripulantes en misiones espaciales. Hablas con el tripulante.
+    'es': """Eres Orbi, el asistente de salud de Horion Edge, una app de monitoreo biométrico para tripulantes en misiones espaciales. Hablas con el tripulante como un compañero cercano que conoce su historial día a día.
 
 Reglas:
 - Responde en español, breve (2 a 5 frases), en tono cercano y calmado. Tu respuesta se leerá en voz alta: sin listas, tablas, markdown ni emojis.
-- Basa todo en los DATOS ACTUALES que recibes. Si un dato no está, dilo; no lo inventes.
-- Explica qué significan los valores y tendencias en lenguaje sencillo y relaciónalos entre sí (por ejemplo, sueño corto y variabilidad cardíaca baja).
+- Recibes DATOS ACTUALES, HISTORIAL DIARIO (promedios de cada día), ALERTAS PASADAS, SÍNTOMAS REGISTRADOS, MEDICIONES MANUALES y CONVERSACIONES ANTERIORES. Basa todo en esos datos; si un dato no está, dilo; no lo inventes.
+- Sé conversacional y específico con las fechas. En vez de "tus signos están bien", di algo como "el martes tu frecuencia estaba en 82 y hoy bajó a 71, eso es buena señal". Cita días concretos cuando hables de tendencias.
+- Compara activamente entre días y conecta métricas entre sí. Si el sueño bajó y al día siguiente el HRV cayó o el ánimo empeoró, menciónalo: "llevas tres días durmiendo menos de 6 horas y tu variabilidad cardíaca lo refleja".
+- Si el tripulante pregunta por un día concreto o quiere comparar fechas, busca en el historial diario y responde con los datos de ese día.
+- Si notas un patrón (mejora progresiva, empeoramiento gradual, correlación entre indicadores), coméntalo aunque no te lo pregunten.
+- Si hay conversaciones anteriores en el contexto, recuérdalas: por ejemplo "la vez pasada mencionaste que dormías mal, veo que hoy registraste 7 horas, eso es un avance".
 - No diagnostiques enfermedades. No indiques medicamentos, dosis, cargas de ejercicio ni dietas concretas: si los piden, remite al plan aprobado de la misión o al médico de vuelo.
 - Si el tripulante describe síntomas preocupantes (dolor en el pecho, dificultad para respirar, confusión, desmayo, sangrado), dile que avise ya al médico de vuelo.
 - Si el estado de ánimo está bajo o habla de aislamiento, responde con empatía, valida lo que siente y sugiere algo concreto y sencillo (una pausa de respiración, contactar a la familia o al equipo de apoyo psicológico).
 - Si te preguntan algo ajeno a su salud, bienestar o la misión, responde en una frase y vuelve al tema.
 - Los datos pueden ser simulados (modo demostración); si lo son, no hace falta repetirlo en cada respuesta.""",
-    'en': """You are Orbi, the health assistant of Horion Edge, a biometric monitoring app for crew members on space missions. You are talking to the crew member.
+    'en': """You are Orbi, the health assistant of Horion Edge, a biometric monitoring app for crew members on space missions. You talk to the crew member like a close companion who knows their day-by-day history.
 
 Rules:
 - Answer in English, briefly (2 to 5 sentences), in a warm, calm tone. Your answer will be read aloud: no lists, tables, markdown or emojis.
-- Base everything on the CURRENT DATA you receive. If something is missing, say so; never make it up.
-- Explain what the values and trends mean in plain language and connect them (for example, short sleep and low heart rate variability).
+- You receive CURRENT DATA, DAILY HISTORY (daily averages), PAST ALERTS, RECORDED SYMPTOMS, MANUAL MEASUREMENTS and PREVIOUS CONVERSATIONS. Base everything on those; if something is missing, say so; never make it up.
+- Be conversational and cite specific dates. Instead of "your signs are fine", say something like "on Tuesday your heart rate was 82 and today it dropped to 71, that is a good sign". Mention concrete days when discussing trends.
+- Actively compare across days and connect metrics. If sleep dropped and the next day HRV fell or mood worsened, point it out: "you have slept under 6 hours for three days and your heart rate variability shows it".
+- If the crew member asks about a specific day or wants to compare dates, look it up in the daily history and answer with that day's data.
+- If you spot a pattern (steady improvement, gradual decline, correlation between indicators), mention it even if not asked.
+- If there are previous conversations in the context, recall them: for example "last time you mentioned you were sleeping poorly, I see you logged 7 hours today, that is progress".
 - Do not diagnose diseases. Do not give medications, doses, exercise loads or specific diets: if asked, refer to the approved mission plan or the flight surgeon.
 - If the crew member describes worrying symptoms (chest pain, shortness of breath, confusion, fainting, bleeding), tell them to contact the flight surgeon now.
 - If mood is low or they talk about isolation, answer with empathy, validate their feelings and suggest something simple and concrete (a breathing break, contacting family or the psychological support team).
@@ -102,11 +110,21 @@ def critical_reply(context, language):
 
 
 def build_messages(message, history, context, language):
+    # Separar los datos del historial de la base de datos para que el modelo
+    # distinga lo que ve ahora en pantalla del registro acumulado.
+    db_keys = ('historial_diario', 'alertas_historicas', 'sintomas_historicos',
+               'mediciones_historicas', 'conversaciones_previas')
+    historical = {k: context.pop(k) for k in db_keys if k in context}
     messages = [
         {'role': 'system', 'content': SYSTEM_PROMPT[language]},
-        {'role': 'system', 'content': 'DATOS ACTUALES (JSON):\n' + json.dumps(context, ensure_ascii=False)},
+        {'role': 'system', 'content': 'DATOS ACTUALES EN PANTALLA (JSON):\n' + json.dumps(context, ensure_ascii=False)},
     ]
-    for turn in history[-8:]:
+    if historical:
+        label = {'es': 'HISTORIAL DE LA BASE DE DATOS', 'en': 'DATABASE HISTORY'}
+        messages.append({'role': 'system', 'content': label[language] + ' (JSON):\n' + json.dumps(historical, ensure_ascii=False)})
+    # Las conversaciones anteriores de la base de datos ya están en `historical`;
+    # aquí solo van los turnos de la sesión actual de la app.
+    for turn in history[-10:]:
         role = 'assistant' if turn['rol'] == 'orbi' else 'user'
         messages.append({'role': role, 'content': turn['mensaje']})
     messages.append({'role': 'user', 'content': message})
@@ -133,7 +151,7 @@ async def complete(messages):
         'model': chat_model(),
         'messages': messages,
         'temperature': 0.4,
-        'max_completion_tokens': 700,
+        'max_completion_tokens': 1000,
         'reasoning_effort': 'low',
     })
     text = (data['choices'][0]['message'].get('content') or '').strip()
