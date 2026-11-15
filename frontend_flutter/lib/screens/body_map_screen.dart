@@ -8,6 +8,8 @@ import '../models/health_knowledge.dart';
 import '../models/hrp_catalog.dart';
 import '../services/edge_controller.dart';
 import '../widgets/indicator_detail.dart';
+import '../widgets/measurement_dialog.dart';
+import '../widgets/vital_icon.dart';
 import '../widgets/viewport_board.dart';
 
 /// Figura humana interactiva: cada región muestra su función, cómo la afecta
@@ -138,16 +140,26 @@ class _BodyMapScreenState extends State<BodyMapScreen>
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
-                    width: wide ? 180 : 96,
-                    child: RepaintBoundary(child: figure),
+                    // El avatar es el protagonista: ~1/3 del ancho.
+                    width: wide
+                        ? (constraints.maxWidth * .34).clamp(260.0, 420.0)
+                        : 96,
+                    child: _FigureStage(
+                      status: statuses[selected]!,
+                      label: wide ? context.t(region.name) : null,
+                      showLegend: wide && !compact,
+                      child: RepaintBoundary(child: figure),
+                    ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: wide ? 16 : 12),
                   Expanded(child: panel),
                 ],
               ),
             ),
-            const SizedBox(height: 4),
-            const _Legend(),
+            if (!wide || compact) ...[
+              const SizedBox(height: 4),
+              const _Legend(),
+            ],
           ],
         );
       },
@@ -155,10 +167,75 @@ class _BodyMapScreenState extends State<BodyMapScreen>
   }
 }
 
+/// Escenario del avatar: halo del color del estado de la zona elegida, su
+/// nombre y la leyenda de colores debajo.
+class _FigureStage extends StatelessWidget {
+  const _FigureStage({
+    required this.status,
+    required this.child,
+    this.label,
+    this.showLegend = false,
+  });
+  final HealthStatus status;
+  final Widget child;
+  final String? label;
+  final bool showLegend;
+
+  @override
+  Widget build(BuildContext context) => AnimatedContainer(
+    duration: const Duration(milliseconds: 400),
+    // Sin etiqueta = pantalla estrecha: margen mínimo para no encoger la figura.
+    padding: EdgeInsets.all(label == null ? 4 : 12),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: status.color.withValues(alpha: .25)),
+      gradient: RadialGradient(
+        center: const Alignment(0, -.15),
+        radius: .9,
+        colors: [
+          status.color.withValues(alpha: .14),
+          const Color(0xFF0B1A23).withValues(alpha: 0),
+        ],
+      ),
+    ),
+    child: Column(
+      children: [
+        Expanded(child: child),
+        if (label != null) ...[
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.circle, size: 10, color: status.color),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+        if (showLegend) ...[
+          const SizedBox(height: 8),
+          const _Legend(center: true),
+        ],
+      ],
+    ),
+  );
+}
+
 class _Legend extends StatelessWidget {
-  const _Legend();
+  const _Legend({this.center = false});
+  final bool center;
   @override
   Widget build(BuildContext context) => Wrap(
+    alignment: center ? WrapAlignment.center : WrapAlignment.start,
     spacing: 18,
     runSpacing: 8,
     children: [
@@ -463,10 +540,21 @@ class _RegionPanel extends StatelessWidget {
     final hasSensors = region.indicatorIds.isNotEmpty;
     final hasCheck = region.symptoms.isNotEmpty;
     final research = researchFor(region.id);
+    final knownStatus =
+        status != HealthStatus.unknown && (hasSensors || hasCheck);
     return ViewportBoard(
       key: ValueKey(region.id),
       minColumnWidth: 310,
+      // Se lee como un periódico: columna 1 de arriba abajo, luego la 2…
+      readingOrder: true,
       children: [
+        // Grupo 1: cómo está esta zona, qué hacer ahora y sus datos. El nombre
+        // de la zona ya se ve bajo el avatar y en el selector.
+        BoardGroupHeader(
+          number: 1,
+          title: context.tr('Cómo estás ahora', 'How you are now'),
+          color: const Color(0xFF38BDF8),
+        ),
         BoardSection(
           children: [
             StatusBanner(
@@ -485,13 +573,104 @@ class _RegionPanel extends StatelessWidget {
             ),
           ],
         ),
-        BoardSection(
-          children: [
-            _section(
-              context.tr('Función', 'Function'),
-              context.t(region.function),
+        if (knownStatus)
+          BoardSection(
+            title: context.tr('Qué hacer ahora', 'What to do now'),
+            children: [
+              Text(
+                context.t(status.escalation),
+                style: const TextStyle(height: 1.4),
+              ),
+            ],
+          ),
+        // 2. Tus datos: indicadores en vivo o autoevaluación de síntomas.
+        // Una tarjeta por elemento: el tablero las reparte en columnas y
+        // páginas sin scroll; solo la primera de cada grupo lleva el título.
+        if (hasSensors)
+          for (var index = 0; index < region.indicatorIds.length; index++)
+            BoardSection(
+              title: index == 0
+                  ? context.tr('Tus datos ahora', 'Your data now')
+                  : null,
+              children: [_indicatorTile(context, region.indicatorIds[index])],
             ),
-          ],
+        // Registro manual de esta zona (presión, glucosa o temperatura), sin
+        // tener que ir al Monitor vital.
+        for (final id in region.indicatorIds.where(
+          (id) => isManualMeasurement(id) && id != 'presion_diastolica',
+        ))
+          BoardSection(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  key: ValueKey('region-measure-$id'),
+                  onPressed:
+                      controller.busy ||
+                          (!controller.demo && !controller.connected)
+                      ? null
+                      : () async {
+                          final saved = await showMeasurementDialog(
+                            context,
+                            controller,
+                            metric: id,
+                          );
+                          if (saved == true && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  context.tr(
+                                    'Medición registrada.',
+                                    'Measurement saved.',
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                  icon: const Icon(Icons.add),
+                  label: Text(
+                    '${context.tr('Registrar', 'Log')}: ${context.t(id == 'presion_sistolica' ? const T('Presión arterial', 'Blood pressure') : indicator(id).name)}',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        if (hasCheck) ..._symptomSections(context, controller, region),
+        // Grupo 2: qué puedes hacer.
+        if (region.prevention.isNotEmpty)
+          BoardGroupHeader(
+            number: 2,
+            title: context.tr('Qué puedes hacer', 'What you can do'),
+            color: const Color(0xFF4ADE80),
+          ),
+        for (var index = 0; index < region.prevention.length; index++)
+          BoardSection(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.check_circle_outline,
+                    size: 18,
+                    color: Color(0xFF4ADE80),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      context.t(region.prevention[index]),
+                      style: const TextStyle(height: 1.35),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        // Grupo 3: para entender (por qué pasa, cómo funciona, investigación).
+        BoardGroupHeader(
+          number: region.prevention.isEmpty ? 2 : 3,
+          title: context.tr('Para entender', 'To understand'),
+          color: const Color(0xFFA99AFB),
         ),
         BoardSection(
           title: context.tr(
@@ -500,38 +679,28 @@ class _RegionPanel extends StatelessWidget {
           ),
           children: [Text(context.t(region.spaceEffect))],
         ),
-        BoardSection(
-          children: [
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [for (final h in region.hazards) HazardChip(hazard: h)],
-            ),
-          ],
-        ),
-        if (hasCheck) ..._symptomSections(context, controller, region),
-        if (hasSensors)
-          for (var index = 0; index < region.indicatorIds.length; index++)
-            BoardSection(
-              title: index == 0
-                  ? context.tr('Indicadores', 'Indicators')
-                  : null,
-              children: [_indicatorTile(context, region.indicatorIds[index])],
-            ),
-        for (var index = 0; index < region.prevention.length; index++)
+        if (region.hazards.isNotEmpty)
           BoardSection(
-            title: index == 0 ? context.tr('Prevención', 'Prevention') : null,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
                 children: [
-                  const Icon(Icons.check, size: 16, color: Color(0xFF38BDF8)),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(context.t(region.prevention[index]))),
+                  for (final h in region.hazards) HazardChip(hazard: h),
                 ],
               ),
             ],
           ),
+        // 5. Contexto: cómo funciona esta zona.
+        BoardSection(
+          children: [
+            _section(
+              context.tr('Función', 'Function'),
+              context.t(region.function),
+            ),
+          ],
+        ),
+        // 6. Para saber más.
         for (final s in research)
           BoardSection(
             title:
@@ -569,7 +738,20 @@ class _RegionPanel extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       dense: true,
-      leading: Icon(ind.icon, color: ind.color),
+      leading: Container(
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: ind.color.withValues(alpha: .14),
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(color: ind.color.withValues(alpha: .4)),
+        ),
+        child: switch (glyphFor(id)) {
+          final glyph? => VitalIcon(glyph, color: ind.color, size: 24),
+          null => Icon(ind.icon, color: ind.color, size: 22),
+        },
+      ),
       title: Text(context.t(ind.name)),
       subtitle: Text('Normal: ${context.t(ind.normalRange)}'),
       trailing: Row(
@@ -588,7 +770,7 @@ class _RegionPanel extends StatelessWidget {
   }
 
   Widget _section(String title, String body) => Padding(
-    padding: const EdgeInsets.only(top: 14),
+    padding: EdgeInsets.zero,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

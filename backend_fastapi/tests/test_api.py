@@ -85,8 +85,24 @@ class EdgeApiTests(unittest.TestCase):
         self.assertEqual(latest['presion_sistolica']['valor'], 150)
         self.assertEqual(latest['glucosa']['origen'], 'MANUAL')
         self.assertEqual({a['metrica_afectada'] for a in state['alerts']}, {'presion_sistolica', 'presion_diastolica'})
-        # 1 lectura de arranque + 3 mediciones + 2 alertas.
-        self.assertEqual(state['pending'], 6)
+        # 1 lectura de arranque + 2 alertas. Las mediciones no se suben a la web.
+        self.assertEqual(state['pending'], 3)
+
+    def test_symptom_checks_persist_latest_per_zone(self):
+        post = lambda body: self.client.post('/api/symptoms', json=body)
+        self.assertEqual(self.client.get('/api/state').json()['symptom_checks'], [])
+        self.assertEqual(post({'zona': 'eyes', 'sintomas': ['blurred_near', 'headache']}).status_code, 200)
+        self.assertEqual(post({'zona': 'bones', 'sintomas': []}).status_code, 200)  # «No tengo ninguno».
+        self.assertEqual(post({'zona': 'eyes', 'sintomas': ['blurred_near']}).status_code, 200)
+        checks = {c['zona']: c['sintomas'] for c in self.client.get('/api/state').json()['symptom_checks']}
+        self.assertEqual(checks, {'eyes': ['blurred_near'], 'bones': []})
+        # Se conserva el historial de cambios y sobrevive a reabrir la base.
+        database.initialize()
+        with database.connection() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM autoevaluaciones').fetchone()[0], 3)
+        self.assertEqual(post({'zona': 'Eyes; DROP', 'sintomas': []}).status_code, 422)
+        self.assertEqual(post({'zona': 'eyes', 'sintomas': ['<script>']}).status_code, 422)
+        self.assertEqual(post({'zona': 'eyes', 'sintomas': ['a'] * 13}).status_code, 422)
 
     def test_seeded_history_and_daily_trends(self):
         self.assertFalse(seed_history())  # Ya hay telemetría del arranque: no se duplica.

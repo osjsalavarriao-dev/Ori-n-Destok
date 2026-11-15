@@ -154,7 +154,7 @@ const indicators = <HealthIndicator>[
     name: T('Frecuencia cardíaca', 'Heart rate'),
     unit: T('BPM', 'BPM'),
     icon: Icons.favorite_outline,
-    color: Color(0xFF38BDF8),
+    color: Color(0xFFF472B6),
     good: (50, 100),
     watch: (40, 120),
     normalRange: T('50–100 BPM en reposo', '50–100 BPM at rest'),
@@ -191,7 +191,7 @@ const indicators = <HealthIndicator>[
     name: T('Oxigenación', 'Oxygen saturation'),
     unit: T('SpO₂ %', 'SpO₂ %'),
     icon: Icons.water_drop_outlined,
-    color: Color(0xFF62DDB0),
+    color: Color(0xFF38BDF8),
     good: (95, 100),
     watch: (92, 94.9),
     normalRange: T('95–100 %', '95–100 %'),
@@ -230,7 +230,7 @@ const indicators = <HealthIndicator>[
     name: T('Variabilidad cardíaca', 'Heart rate variability'),
     unit: T('HRV · ms', 'HRV · ms'),
     icon: Icons.monitor_heart_outlined,
-    color: Color(0xFFA99AFB),
+    color: Color(0xFFE879F9),
     good: (40, 200),
     watch: (25, 39.9),
     normalRange: T(
@@ -271,7 +271,7 @@ const indicators = <HealthIndicator>[
     name: T('Temperatura', 'Temperature'),
     unit: T('°C', '°C'),
     icon: Icons.thermostat_outlined,
-    color: Color(0xFFF3C784),
+    color: Color(0xFFFB923C),
     good: (36.1, 37.5),
     watch: (35.5, 38.0),
     normalRange: T('36,1–37,5 °C', '36.1–37.5 °C'),
@@ -304,7 +304,7 @@ const indicators = <HealthIndicator>[
     name: T('Presión arterial', 'Blood pressure'),
     unit: T('mmHg', 'mmHg'),
     icon: Icons.speed,
-    color: Color(0xFFFB7185),
+    color: Color(0xFF34D399),
     good: (90, 129),
     watch: (80, 139),
     normalRange: T(
@@ -344,7 +344,7 @@ const indicators = <HealthIndicator>[
     name: T('Presión diastólica', 'Diastolic pressure'),
     unit: T('mmHg', 'mmHg'),
     icon: Icons.speed,
-    color: Color(0xFFFB7185),
+    color: Color(0xFF34D399),
     good: (60, 79),
     watch: (50, 89),
     normalRange: T('60–79 mmHg', '60–79 mmHg'),
@@ -364,7 +364,7 @@ const indicators = <HealthIndicator>[
     name: T('Glucosa en sangre', 'Blood glucose'),
     unit: T('mg/dL', 'mg/dL'),
     icon: Icons.bloodtype_outlined,
-    color: Color(0xFFFDBA74),
+    color: Color(0xFFA3E635),
     good: (70, 99),
     watch: (54, 125),
     normalRange: T('70–99 mg/dL en ayunas', '70–99 mg/dL fasting'),
@@ -434,7 +434,7 @@ const indicators = <HealthIndicator>[
     name: T('Estado de ánimo', 'Mood'),
     unit: T('de 1 a 5', '1 to 5'),
     icon: Icons.mood,
-    color: Color(0xFF2DD4BF),
+    color: Color(0xFFFDE047),
     good: (4, 5),
     watch: (3, 3),
     normalRange: T('4–5', '4–5'),
@@ -794,6 +794,41 @@ const bodyRegions = <BodyRegion>[
     ],
     indicatorIds: [],
     hazards: [SpaceHazard.gravity],
+    symptoms: [
+      Symptom(
+        'back_pain',
+        T(
+          '¿Tienes dolor de espalda o de articulaciones?',
+          'Do you have back or joint pain?',
+        ),
+        T(
+          'Dolor de espalda: es frecuente porque la columna se alarga sin gravedad. Estira con suavidad y, si persiste o te impide trabajar, coméntalo con el médico de vuelo.',
+          'Back pain: it is common because the spine lengthens without gravity. Stretch gently and, if it persists or stops you from working, tell the flight surgeon.',
+        ),
+      ),
+      Symptom(
+        'missed_exercise',
+        T(
+          '¿Te has saltado sesiones de ejercicio esta semana?',
+          'Have you skipped exercise sessions this week?',
+        ),
+        T(
+          'Ejercicio pendiente: retoma tus 2 horas diarias. Es la principal defensa contra la pérdida de hueso y músculo.',
+          'Missed exercise: resume your 2 hours a day. It is the main defence against bone and muscle loss.',
+        ),
+      ),
+      Symptom(
+        'weakness',
+        T(
+          '¿Notas menos fuerza o calambres musculares?',
+          'Do you notice less strength or muscle cramps?',
+        ),
+        T(
+          'Menos fuerza o calambres: revisa tu hidratación y la carga de ejercicio, y coméntalo en la conferencia médica.',
+          'Less strength or cramps: check your hydration and exercise load, and raise it at your medical conference.',
+        ),
+      ),
+    ],
     earthBenefit: T(
       'Ayuda a combatir la osteoporosis: los efectos en astronautas se parecen a un envejecimiento acelerado.',
       'Helps fight osteoporosis: the effects seen in astronauts resemble accelerated aging.',

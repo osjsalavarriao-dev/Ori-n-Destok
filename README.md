@@ -37,7 +37,7 @@ API documentada al iniciar el backend: <http://127.0.0.1:8000/docs>. La direcci�
 - Interfaz oscura y seis vistas: monitor, mapa corporal, tendencias, riesgos y entorno, Orbi, historial/sync.
 - Tendencias de 7, 14 o 30 días con promedio diario, banda de rango normal y **línea base personal** (promedio de los 3 primeros días de misión). Avisa si los últimos 3 días se alejan de la base más que la tolerancia del indicador.
 - Terminología de NASA HRP: **5 peligros** (las causas) y **17 riesgos** para la salud (las consecuencias, en 3 categorías), en `lib/models/hrp_catalog.dart`. La app indica cuáles vigila con indicadores o autoevaluaciones y cuáles son solo informativos.
-- Mapa corporal con 8 zonas, entre ellas **ojos y visión (SANS)**, el principal riesgo de salud según NASA, y **oído interno y equilibrio**. Incluye autoevaluación de síntomas (solo en memoria durante la sesión), la investigación de NASA relacionada (ARCHeR, Thigh Cuff, B-Complex, Zero T2…, marcada como estudios y no como tratamientos) y el beneficio en la Tierra según la Agencia Espacial Canadiense.
+- Mapa corporal con 8 zonas, entre ellas **ojos y visión (SANS)**, el principal riesgo de salud según NASA, y **oído interno y equilibrio**. Incluye autoevaluación de síntomas (con backend se guarda en la tabla `autoevaluaciones` y se recupera al abrir la app; en modo demo, solo en memoria), la investigación de NASA relacionada (ARCHeR, Thigh Cuff, B-Complex, Zero T2…, marcada como estudios y no como tratamientos) y el beneficio en la Tierra según la Agencia Espacial Canadiense.
 - Riesgos y entorno: los cinco peligros de NASA HRP, con la exposición según el entorno (estación, nave en tránsito, rover, base lunar o marciana) y la señal de tus indicadores. Incluye la dosis de radiación estimada frente al límite de carrera (600 mSv), el retraso de comunicación y qué cambia al escalar una alerta. El entorno elegido no se guarda al cerrar la app.
 - Registro manual de presión arterial, glucosa y temperatura, con instrucciones y vista previa del semáforo. La presión y la glucosa son mediciones puntuales (tabla `mediciones`), no telemetría continua.
 - Con una base de datos vacía, el backend crea 13 días de historial simulado para que haya tendencias. Se desactiva con `HORION_SEED_HISTORY=0`. El modo demo genera el mismo historial en memoria.
@@ -48,12 +48,12 @@ API documentada al iniciar el backend: <http://127.0.0.1:8000/docs>. La direcci�
 - Simulación de corte de enlace y anomalía; reconocimiento de alertas.
 - Registro de sueño, agua y energía con validación en el backend.
 - Esquema SQLite del contexto, ampliado con `bienestar` porque los documentos solicitan registrar agua y energía.
-- Cola local: conteo de registros `synced = 0`. No se marca ningún registro como enviado.
+- Sincronización con Horion Web (`app/cloud_sync.py`): con `HORION_CLOUD_URL` y `EDGE_API_KEY` en `backend_fastapi/.env`, el backend sube cada 30 s la telemetría, las alertas y el chat de Orbi pendientes (`synced = 0`) a `POST /api/v1/sync/ingest/` de la web. Un lote fallido se guarda en `sync_pendiente` y se reenvía idéntico (mismo SHA-256) con backoff hasta 5 min, así que no se duplica. `POST /api/sync/now` fuerza un envío; el corte de enlace simulado lo pausa. Bienestar y mediciones aún no forman parte del contrato y se quedan en el equipo. Contrato y despliegue: `HORIO_WEB/docs/edge-api.md` y `HORIO_WEB/docs/despliegue.md`.
 - Runner nativo de Windows generado con Flutter y pruebas de interfaz/API.
 
 ## Pendiente del blueprint
 
-Esta entrega es una base funcional de desarrollo, no la implementación clínica completa. No tiene conexión a sensores reales, Gemini, voz/wake word, protocolos médicos validados, Z-score/fatiga, ni sincronización Django/Supabase. El chat demo es temporal; la tabla `chat_historial` está preparada para la integración posterior. El interruptor de enlace solo simula un estado, no detecta conectividad real. La nube necesita definir contrato, autenticación, confirmaciones e idempotencia antes de enviar datos. SHA-256 es un hash de integridad, no cifrado ni autenticación.
+Esta entrega es una base funcional de desarrollo, no la implementación clínica completa. No tiene conexión a sensores reales, Gemini, voz/wake word, protocolos médicos validados, Z-score/fatiga,. El chat demo es temporal; la tabla `chat_historial` está preparada para la integración posterior. El interruptor de enlace solo simula un estado, no detecta conectividad real. SHA-256 es un hash de integridad, no cifrado ni autenticación.
 
 Las lecturas y reglas son demostrativas, sin evaluación clínica. JetBrains Mono no está empaquetada; las cifras usan Consolas de Windows. El backend se inicia por separado y no se incluye dentro del ejecutable.
 

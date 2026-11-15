@@ -47,24 +47,37 @@ const _fields = {
   ],
 };
 
-/// Abre el diálogo; devuelve true si se guardó la medición.
+/// Si el indicador se registra a mano con este diálogo (presión, glucosa o
+/// temperatura). El resto llega del sensor o del registro de bienestar.
+bool isManualMeasurement(String indicatorId) =>
+    _fields.values.any((list) => list.any((f) => f.id == indicatorId));
+
+/// Abre el diálogo; devuelve true si se guardó la medición. Con [metric]
+/// (p. ej. 'glucosa') se abre directamente en ese tipo de medición.
 Future<bool?> showMeasurementDialog(
   BuildContext context,
-  EdgeController controller,
-) => showDialog<bool>(
+  EdgeController controller, {
+  String? metric,
+}) => showDialog<bool>(
   context: context,
-  builder: (_) => _MeasurementDialog(controller: controller),
+  builder: (_) => _MeasurementDialog(controller: controller, metric: metric),
 );
 
 class _MeasurementDialog extends StatefulWidget {
-  const _MeasurementDialog({required this.controller});
+  const _MeasurementDialog({required this.controller, this.metric});
   final EdgeController controller;
+  final String? metric;
   @override
   State<_MeasurementDialog> createState() => _MeasurementDialogState();
 }
 
 class _MeasurementDialogState extends State<_MeasurementDialog> {
-  _Kind kind = _Kind.pressure;
+  late _Kind kind = _fields.entries
+      .firstWhere(
+        (e) => e.value.any((f) => f.id == widget.metric),
+        orElse: () => _fields.entries.first,
+      )
+      .key;
   final _text = <String, TextEditingController>{
     for (final list in _fields.values)
       for (final f in list) f.id: TextEditingController(),

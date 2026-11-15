@@ -37,8 +37,17 @@ class VitalMonitorScreen extends StatelessWidget {
     final ind = indicator(id);
     final value = controller.displayValue(id);
     final status = controller.displayStatus(id);
+    // Últimas 40 lecturas del sensor (~3 min); vacío para los registros manuales.
+    final samples = controller.telemetry;
+    final history = [
+      for (final t in samples.skip(
+        samples.length > 40 ? samples.length - 40 : 0,
+      ))
+        ?t[id],
+    ];
     return VitalCard(
       metric: id,
+      history: history,
       label: context.t(ind.name),
       value: value,
       unit: context.t(ind.unit),

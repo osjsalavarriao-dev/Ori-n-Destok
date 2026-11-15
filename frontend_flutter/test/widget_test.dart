@@ -84,7 +84,25 @@ void main() {
     expect(find.text('Corazón y circulación'), findsWidgets);
     await tester.tap(find.widgetWithText(ChoiceChip, 'Huesos y músculos'));
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('Sin sensor directo a bordo'), findsOneWidget);
+    // Huesos y músculos no tiene sensor: se evalúa con su autoevaluación.
+    expect(find.text('Responde la autoevaluación de síntomas'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('symptom-back_pain')));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Estado: Vigilar'), findsOneWidget);
+    // Desde la zona se registra su medición: el diálogo abre ya en glucosa.
+    await tester.tap(
+      find.widgetWithText(ChoiceChip, 'Metabolismo y nutrición'),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.byKey(const ValueKey('region-measure-glucosa')));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byKey(const ValueKey('measure-glucosa')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('measure-presion_sistolica')),
+      findsNothing,
+    );
+    await tester.tap(find.text('Cancelar'));
+    await tester.pump(const Duration(milliseconds: 500));
     // Tocar la cabeza de la figura selecciona el cerebro.
     final figure = tester.getRect(find.byKey(const ValueKey('body-figure')));
     final scale = figure.width / 200 < figure.height / 440
@@ -132,6 +150,20 @@ void main() {
     expect(find.text('Resumen frente a tu línea base'), findsOneWidget);
     expect(find.textContaining('Base '), findsWidgets);
     expect(find.text('Se necesitan al menos 4 días con datos'), findsNothing);
+    // Tocar la tarjeta de un indicador muestra SU detalle en el panel 2.
+    String detailTitle(String id) {
+      final i = indicator(id);
+      return '${i.name.of(AppLanguage.es)} · ${i.unit.of(AppLanguage.es)}';
+    }
+
+    expect(find.text(detailTitle('hrv')), findsOneWidget); // Preseleccionado.
+    await _pageTo(tester, find.byKey(const ValueKey('trend-glucosa')));
+    await tester.tap(find.byKey(const ValueKey('trend-glucosa')));
+    await tester.pumpAndSettle();
+    expect(find.text(detailTitle('glucosa')), findsOneWidget);
+    expect(find.text(detailTitle('hrv')), findsNothing);
+    expect(find.text('Evolución · últimos 14 días'), findsOneWidget);
+    expect(find.text('Por qué cambia en el espacio'), findsOneWidget);
 
     await tester.tap(find.text('Riesgos y entorno').first);
     await tester.pumpAndSettle();
@@ -315,7 +347,7 @@ void main() {
     await tester.tap(find.text('Body map').first);
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('Heart and circulation'), findsWidgets);
-    expect(find.text('Prevention'), findsOneWidget);
+    expect(find.text('What you can do'), findsOneWidget);
 
     await tester.tap(find.text('Trends').first);
     await tester.pumpAndSettle();

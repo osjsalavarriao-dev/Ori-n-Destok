@@ -58,6 +58,15 @@ CREATE TABLE IF NOT EXISTS sync_logs (
     estado TEXT NOT NULL CHECK (estado IN ('SUCCESS', 'FAILED_NO_NETWORK', 'FAILED_SERVER'))
 );
 
+-- 5b. Lote en vuelo hacia Horion Web. Se reenvía idéntico (mismo hash) hasta que la web lo confirme.
+CREATE TABLE IF NOT EXISTS sync_pendiente (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    payload_json TEXT NOT NULL,
+    hash_sha256 TEXT NOT NULL,
+    ids_json TEXT NOT NULL,                 -- {"telemetria": [...], "alertas_medicas": [...], "chat_historial": [...]}
+    creado_utc TEXT NOT NULL
+);
+
 -- Índices para acelerar consultas de registros pendientes de sincronización
 CREATE INDEX IF NOT EXISTS idx_telemetria_synced ON telemetria(synced);
 CREATE INDEX IF NOT EXISTS idx_alertas_synced ON alertas_medicas(synced);
@@ -77,3 +86,15 @@ CREATE TABLE IF NOT EXISTS mediciones (
 );
 CREATE INDEX IF NOT EXISTS idx_mediciones_synced ON mediciones(synced);
 CREATE INDEX IF NOT EXISTS idx_mediciones_metrica ON mediciones(metrica, timestamp_utc);
+
+-- 7. Autoevaluaciones de síntomas por zona del mapa corporal (ojos, equilibrio,
+--    piel, huesos y músculos…): zonas que no tienen sensor. Cada cambio es una fila;
+--    la más reciente de cada zona es su estado actual.
+CREATE TABLE IF NOT EXISTS autoevaluaciones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp_utc TEXT NOT NULL,
+    zona TEXT NOT NULL,                     -- id de la zona en la app ('eyes', 'bones'…)
+    sintomas_json TEXT NOT NULL,            -- ids de los síntomas presentes; '[]' = ninguno
+    synced INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_autoevaluaciones_zona ON autoevaluaciones(zona, timestamp_utc);

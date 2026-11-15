@@ -150,18 +150,12 @@ class _HistorySyncScreenState extends State<HistorySyncScreen> {
                       'Temporary data. Demo mode resets when you close the app or switch modes.',
                     )
                   : context.tr(
-                      'Persistencia local en SQLite. Los datos permanecen pendientes.',
-                      'Stored locally in SQLite. Data remains pending.',
+                      'Persistencia local en SQLite. Telemetría, alertas y conversaciones con Orbi se suben a Horion Web; bienestar y mediciones se quedan en este equipo.',
+                      'Stored locally in SQLite. Telemetry, alerts and Orbi conversations are uploaded to Horion Web; wellbeing and measurements stay on this device.',
                     ),
             ),
             const SizedBox(height: 8),
-            Text(
-              context.tr(
-                'Horion Cloud: integración pendiente · No se han enviado datos a la nube.',
-                'Horion Cloud: integration pending · No data has been sent to the cloud.',
-              ),
-              style: const TextStyle(color: Colors.amber),
-            ),
+            _CloudStatus(controller: c),
           ],
         ),
         const SizedBox(height: 16),
@@ -211,6 +205,77 @@ class _HistorySyncScreenState extends State<HistorySyncScreen> {
               ),
             ),
           ),
+      ],
+    );
+  }
+}
+
+/// Estado del envío a Horion Web, según lo que informa el backend en /api/state.
+class _CloudStatus extends StatelessWidget {
+  const _CloudStatus({required this.controller});
+  final EdgeController controller;
+
+  String _time(String? iso) => iso == null
+      ? '—'
+      : DateTime.parse(iso).toLocal().toString().split('.').first;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller;
+    if (c.demo) {
+      return Text(
+        context.tr(
+          'Horion Web: el modo demo no envía datos.',
+          'Horion Web: demo mode does not send data.',
+        ),
+        style: const TextStyle(color: Colors.amber),
+      );
+    }
+    if (!c.cloudConfigured) {
+      return Text(
+        context.tr(
+          'Horion Web: sin configurar. Define HORION_CLOUD_URL y EDGE_API_KEY en backend_fastapi/.env y reinicia el backend.',
+          'Horion Web: not configured. Set HORION_CLOUD_URL and EDGE_API_KEY in backend_fastapi/.env and restart the backend.',
+        ),
+        style: const TextStyle(color: Colors.amber),
+      );
+    }
+    final state = c.cloudSync['estado'] as String?;
+    final detail = c.cloudSync['detalle'] as String?;
+    final lastOk = _time(c.cloudSync['ultimo_exito_utc'] as String?);
+    final failed = state == 'FAILED_NO_NETWORK' || state == 'FAILED_SERVER';
+    final message = switch (state) {
+      'FAILED_NO_NETWORK' => context.tr(
+        'Horion Web: sin conexión. Se reintentará; los datos siguen en la cola local. Último envío correcto: $lastOk',
+        'Horion Web: no connection. It will retry; data stays in the local queue. Last successful upload: $lastOk',
+      ),
+      'FAILED_SERVER' => context.tr(
+        'Horion Web rechazó el lote: ${detail ?? ''}',
+        'Horion Web rejected the batch: ${detail ?? ''}',
+      ),
+      null => context.tr(
+        'Horion Web: configurado, esperando el primer envío.',
+        'Horion Web: configured, waiting for the first upload.',
+      ),
+      _ => context.tr(
+        'Horion Web: conectado. Último envío correcto: $lastOk',
+        'Horion Web: connected. Last successful upload: $lastOk',
+      ),
+    };
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            message,
+            style: TextStyle(color: failed ? Colors.amber : Colors.greenAccent),
+          ),
+        ),
+        const SizedBox(width: 12),
+        OutlinedButton.icon(
+          onPressed: c.busy || c.offline ? null : c.syncNow,
+          icon: const Icon(Icons.cloud_upload_outlined),
+          label: Text(context.tr('Sincronizar ahora', 'Sync now')),
+        ),
       ],
     );
   }

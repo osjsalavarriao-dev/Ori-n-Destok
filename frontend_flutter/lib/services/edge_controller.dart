@@ -31,6 +31,11 @@ class EdgeController extends ChangeNotifier {
   bool _disposed = false, _polling = false;
   T? error;
   int pending = 0;
+
+  /// Horion Web: si el backend tiene URL y clave, y el último resultado del envío
+  /// (`estado`, `detalle`, `ultimo_exito_utc`). Nunca se usa en modo demo.
+  bool cloudConfigured = false;
+  Map<String, dynamic> cloudSync = {};
   List<Telemetry> telemetry = [];
   List<Map<String, dynamic>> alerts = [], wellbeing = [];
 
@@ -86,18 +91,24 @@ class EdgeController extends ChangeNotifier {
   HealthStatus displayStatus(String id) => id == 'presion_sistolica'
       ? worstOf([statusOf(id), statusOf('presion_diastolica')])
       : statusOf(id);
-  /// Síntomas marcados en la autoevaluación, por zona. Solo en memoria
-  /// durante la sesión; todavía no se guardan en el backend.
+  /// Síntomas marcados en la autoevaluación, por zona. Con backend se guardan
+  /// en SQLite (tabla `autoevaluaciones`) y se recuperan al abrir la app; en
+  /// modo demo viven solo en memoria.
   final Map<String, Set<String>> symptoms = {};
 
   /// Zonas cuya autoevaluación ya respondió el astronauta.
   final Set<String> checkedRegions = {};
+
+  /// Las autoevaluaciones guardadas se cargan una sola vez por sesión: después
+  /// manda lo que el astronauta toca, para que un sondeo no pise un cambio.
+  bool _symptomsLoaded = false;
 
   void setSymptom(String regionId, String symptomId, bool present) {
     final set = symptoms.putIfAbsent(regionId, () => {});
     present ? set.add(symptomId) : set.remove(symptomId);
     checkedRegions.add(regionId);
     _emit();
+    _saveSymptoms(regionId);
   }
 
   /// Confirma la autoevaluación sin síntomas.
@@ -105,6 +116,24 @@ class EdgeController extends ChangeNotifier {
     symptoms[regionId]?.clear();
     checkedRegions.add(regionId);
     _emit();
+    _saveSymptoms(regionId);
+  }
+
+  Future<void> _saveSymptoms(String regionId) async {
+    if (demo) return;
+    try {
+      await _api.request('/api/symptoms', {
+        'zona': regionId,
+        'sintomas': [...?symptoms[regionId]],
+      });
+    } catch (_) {
+      if (_disposed) return;
+      error = const T(
+        'No se pudo guardar la autoevaluación. Comprueba el backend.',
+        'The self-check could not be saved. Check the backend.',
+      );
+      _emit();
+    }
   }
 
   /// Sin responder: sin datos. Con algún síntoma: vigilar. Sin síntomas: normal.
@@ -226,7 +255,24 @@ class EdgeController extends ChangeNotifier {
           .toList();
       _trendsAt = now;
     }
+    if (!_symptomsLoaded) {
+      _symptomsLoaded = true;
+      for (final check in data['symptom_checks'] as List? ?? const []) {
+        final zone = (check as Map)['zona'] as String;
+        // Se ignoran zonas o síntomas que esta versión de la app no conoce.
+        final region = bodyRegions.where((r) => r.id == zone).firstOrNull;
+        if (region == null || region.symptoms.isEmpty) continue;
+        final known = {for (final s in region.symptoms) s.id};
+        symptoms[zone] = {
+          for (final id in check['sintomas'] as List)
+            if (known.contains(id)) id as String,
+        };
+        checkedRegions.add(zone);
+      }
+    }
     pending = data['pending'] as int;
+    cloudConfigured = data['cloud_configured'] as bool? ?? false;
+    cloudSync = Map<String, dynamic>.from(data['cloud_sync'] as Map? ?? {});
     offline = data['offline'] as bool;
     connected = true;
     error = null;
@@ -315,7 +361,10 @@ class EdgeController extends ChangeNotifier {
     _demoToday.clear();
     symptoms.clear();
     checkedRegions.clear();
+    _symptomsLoaded = false;
     pending = 0;
+    cloudConfigured = false;
+    cloudSync = {};
     offline = false;
     error = null;
     connected = false;
@@ -350,6 +399,9 @@ class EdgeController extends ChangeNotifier {
       _emit();
     }
   }
+
+  /// Envía un lote a Horion Web sin esperar al intervalo del backend.
+  Future<void> syncNow() => action('/api/sync/now', {}, () {});
 
   Future<void> toggleOffline(bool value) => action('/api/simulation/offline', {
     'enabled': value,

@@ -89,11 +89,17 @@ class ViewportBoard extends StatefulWidget {
     required this.children,
     this.minColumnWidth = 360,
     this.maxColumns = 3,
+    this.readingOrder = false,
   });
 
   final List<Widget> children;
   final double minColumnWidth;
   final int maxColumns;
+
+  /// true: llena la primera columna de arriba abajo, luego la segunda… (orden
+  /// de lectura de periódico). false: cada sección va a la columna más corta,
+  /// que aprovecha mejor el espacio pero salta entre columnas.
+  final bool readingOrder;
 
   @override
   State<ViewportBoard> createState() => _ViewportBoardState();
@@ -112,6 +118,11 @@ class _ViewportBoardState extends State<ViewportBoard> {
             page: page,
             minColumnWidth: widget.minColumnWidth,
             maxColumns: widget.maxColumns,
+            readingOrder: widget.readingOrder,
+            columnBreaks: {
+              for (var index = 0; index < widget.children.length; index++)
+                if (widget.children[index] is BoardGroupHeader) index,
+            },
             onPages: (positions) {
               if (!mounted) return;
               final count = positions.isEmpty ? 1 : positions.last + 1;
@@ -137,14 +148,20 @@ class _ViewportBoardState extends State<ViewportBoard> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Text(
-              pages == 1
-                  ? context.tr('Vista completa', 'Full view')
-                  : context.tr(
-                      'Página ${page + 1} de $pages',
-                      'Page ${page + 1} of $pages',
-                    ),
-              style: const TextStyle(fontSize: 12, color: Colors.white60),
+            // Flexible: en un tablero estrecho el texto se recorta en vez de
+            // desbordar la fila.
+            Flexible(
+              child: Text(
+                pages == 1
+                    ? context.tr('Vista completa', 'Full view')
+                    : context.tr(
+                        'Página ${page + 1} de $pages',
+                        'Page ${page + 1} of $pages',
+                      ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, color: Colors.white60),
+              ),
             ),
             if (pages > 1) ...[
               IconButton(
@@ -164,6 +181,65 @@ class _ViewportBoardState extends State<ViewportBoard> {
         ),
       ),
     ],
+  );
+}
+
+/// Encabezado numerado de un grupo de secciones relacionadas. En un tablero
+/// con `readingOrder`, cada grupo empieza en su propia columna.
+class BoardGroupHeader extends StatelessWidget {
+  const BoardGroupHeader({
+    super.key,
+    required this.number,
+    required this.title,
+    required this.color,
+  });
+  final int number;
+  final String title;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 2, bottom: 2),
+    child: Row(
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: .16),
+            shape: BoxShape.circle,
+            border: Border.all(color: color.withValues(alpha: .7)),
+          ),
+          child: Text(
+            '$number',
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              letterSpacing: .6,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Container(height: 1, color: color.withValues(alpha: .35)),
+        ),
+      ],
+    ),
   );
 }
 
@@ -206,14 +282,22 @@ class _BoardLayout extends MultiChildRenderObjectWidget {
     required this.maxColumns,
     required this.onPages,
     required super.children,
+    this.readingOrder = false,
+    this.columnBreaks = const {},
   });
   final int page, maxColumns;
   final double minColumnWidth;
   final ValueChanged<List<int>> onPages;
+  final bool readingOrder;
+
+  /// Índices de los hijos que empiezan columna nueva (encabezados de grupo).
+  final Set<int> columnBreaks;
 
   @override
   RenderObject createRenderObject(BuildContext context) =>
-      _RenderBoard(page, minColumnWidth, maxColumns, onPages);
+      _RenderBoard(page, minColumnWidth, maxColumns, onPages)
+        ..readingOrder = readingOrder
+        ..columnBreaks = columnBreaks;
 
   @override
   void updateRenderObject(BuildContext context, _RenderBoard renderObject) {
@@ -222,6 +306,8 @@ class _BoardLayout extends MultiChildRenderObjectWidget {
       ..minColumnWidth = minColumnWidth
       ..maxColumns = maxColumns
       ..onPages = onPages
+      ..readingOrder = readingOrder
+      ..columnBreaks = columnBreaks
       ..markNeedsLayout()
       ..markNeedsSemanticsUpdate();
   }
@@ -235,6 +321,8 @@ class _RenderBoard extends RenderBox
   int page, maxColumns;
   double minColumnWidth;
   ValueChanged<List<int>> onPages;
+  bool readingOrder = false;
+  Set<int> columnBreaks = const {};
   List<int>? _reportedAssignments;
 
   @override
@@ -272,13 +360,26 @@ class _RenderBoard extends RenderBox
     var currentPage = 0;
     final assignments = <int>[];
     var child = firstChild;
+    var next = 0; // Columna actual en orden de lectura.
+    var index = -1;
     while (child != null) {
-      var column = heights.indexOf(heights.reduce(math.min));
-      if (heights[column] > 0 &&
-          heights[column] + child.size.height > size.height) {
+      index++;
+      var column = readingOrder
+          ? next
+          : heights.indexOf(heights.reduce(math.min));
+      if (readingOrder &&
+          heights[column] > 0 &&
+          (columnBreaks.contains(index) ||
+              heights[column] + child.size.height > size.height)) {
+        // Columna llena o empieza un grupo: sigue en la siguiente.
+        column = ++next;
+      }
+      if (column >= columns ||
+          heights[column] > 0 &&
+              heights[column] + child.size.height > size.height) {
         currentPage++;
         heights.fillRange(0, columns, 0);
-        column = 0;
+        column = next = 0;
       }
       final data = child.parentData! as _BoardData;
       data.page = currentPage;
