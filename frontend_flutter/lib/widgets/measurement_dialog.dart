@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import '../l10n/language.dart';
 import '../models/health_knowledge.dart';
 import '../services/edge_controller.dart';
+import 'viewport_board.dart';
 
 enum _Kind { pressure, glucose, temperature }
 
@@ -19,21 +20,41 @@ class _Field {
 
 const _fields = {
   _Kind.pressure: [
-    _Field('presion_sistolica', T('Sistólica (alta)', 'Systolic (upper)'), 50, 260),
-    _Field('presion_diastolica', T('Diastólica (baja)', 'Diastolic (lower)'), 30, 160),
+    _Field(
+      'presion_sistolica',
+      T('Sistólica (alta)', 'Systolic (upper)'),
+      50,
+      260,
+    ),
+    _Field(
+      'presion_diastolica',
+      T('Diastólica (baja)', 'Diastolic (lower)'),
+      30,
+      160,
+    ),
   ],
-  _Kind.glucose: [_Field('glucosa', T('Glucosa', 'Glucose'), 20, 600, decimal: true)],
+  _Kind.glucose: [
+    _Field('glucosa', T('Glucosa', 'Glucose'), 20, 600, decimal: true),
+  ],
   _Kind.temperature: [
-    _Field('temperatura_corporal', T('Temperatura', 'Temperature'), 30, 43, decimal: true),
+    _Field(
+      'temperatura_corporal',
+      T('Temperatura', 'Temperature'),
+      30,
+      43,
+      decimal: true,
+    ),
   ],
 };
 
 /// Abre el diálogo; devuelve true si se guardó la medición.
-Future<bool?> showMeasurementDialog(BuildContext context, EdgeController controller) =>
-    showDialog<bool>(
-      context: context,
-      builder: (_) => _MeasurementDialog(controller: controller),
-    );
+Future<bool?> showMeasurementDialog(
+  BuildContext context,
+  EdgeController controller,
+) => showDialog<bool>(
+  context: context,
+  builder: (_) => _MeasurementDialog(controller: controller),
+);
 
 class _MeasurementDialog extends StatefulWidget {
   const _MeasurementDialog({required this.controller});
@@ -92,8 +113,7 @@ class _MeasurementDialogState extends State<_MeasurementDialog> {
     setState(() => saving = true);
     final fields = _fields[kind]!;
     await c.addMeasurement({
-      for (final f in fields)
-        f.id: f.decimal ? _value(f)! : _value(f)!.round(),
+      for (final f in fields) f.id: f.decimal ? _value(f)! : _value(f)!.round(),
     });
     if (!mounted) return;
     setState(() => saving = false);
@@ -109,74 +129,72 @@ class _MeasurementDialogState extends State<_MeasurementDialog> {
     return AlertDialog(
       title: Text(context.tr('Registrar medición', 'Log measurement')),
       content: SizedBox(
-        width: 480,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SegmentedButton<_Kind>(
-                segments: [
-                  ButtonSegment(
-                    value: _Kind.pressure,
-                    icon: const Icon(Icons.speed),
-                    label: Text(context.tr('Presión', 'Pressure')),
-                  ),
-                  ButtonSegment(
-                    value: _Kind.glucose,
-                    icon: const Icon(Icons.bloodtype_outlined),
-                    label: Text(context.tr('Glucosa', 'Glucose')),
-                  ),
-                  ButtonSegment(
-                    value: _Kind.temperature,
-                    icon: const Icon(Icons.thermostat_outlined),
-                    label: Text(context.tr('Temperatura', 'Temperature')),
-                  ),
-                ],
-                selected: {kind},
-                onSelectionChanged: (v) => setState(() => kind = v.first),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF111D2D),
-                  borderRadius: BorderRadius.circular(8),
+        width: 900,
+        height: MediaQuery.sizeOf(context).height * .6,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SegmentedButton<_Kind>(
+              segments: [
+                ButtonSegment(
+                  value: _Kind.pressure,
+                  icon: const Icon(Icons.speed),
+                  label: Text(context.tr('Presión', 'Pressure')),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.lightbulb_outline, size: 18, color: Color(0xFF38BDF8)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${context.tr('Cómo medir', 'How to measure')}: ${context.t(ind.howToMeasure)}',
+                ButtonSegment(
+                  value: _Kind.glucose,
+                  icon: const Icon(Icons.bloodtype_outlined),
+                  label: Text(context.tr('Glucosa', 'Glucose')),
+                ),
+                ButtonSegment(
+                  value: _Kind.temperature,
+                  icon: const Icon(Icons.thermostat_outlined),
+                  label: Text(context.tr('Temperatura', 'Temperature')),
+                ),
+              ],
+              selected: {kind},
+              onSelectionChanged: (v) => setState(() => kind = v.first),
+            ),
+            const SizedBox(height: 12),
+            if (problem != null &&
+                fields.every((f) => _text[f.id]!.text.trim().isNotEmpty) &&
+                fields.every((f) => _error(f) == null))
+              Text(
+                problem,
+                style: TextStyle(color: HealthStatus.critical.color),
+              ),
+            if (error != null)
+              Text(
+                context.t(error),
+                style: TextStyle(color: HealthStatus.critical.color),
+              ),
+            Expanded(
+              child: ViewportBoard(
+                key: ValueKey(kind),
+                children: [
+                  for (final f in fields)
+                    BoardSection(
+                      children: [
+                        _input(f),
+                        if (problem == null) ...[
+                          const SizedBox(height: 8),
+                          _preview(f),
+                        ],
+                      ],
+                    ),
+                  BoardSection(
+                    title: context.tr('Cómo medir', 'How to measure'),
+                    children: [
+                      Text(
+                        context.t(ind.howToMeasure),
                         style: const TextStyle(fontSize: 13, height: 1.4),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              for (final f in fields) ...[
-                _input(f),
-                const SizedBox(height: 12),
-              ],
-              if (problem == null)
-                for (final f in fields) ...[
-                  _preview(f),
-                  const SizedBox(height: 6),
+                    ],
+                  ),
                 ],
-              if (problem != null &&
-                  fields.every((f) => _text[f.id]!.text.trim().isNotEmpty) &&
-                  fields.every((f) => _error(f) == null))
-                Text(problem, style: TextStyle(color: HealthStatus.critical.color)),
-              if (error != null) ...[
-                const SizedBox(height: 8),
-                Text(context.t(error), style: TextStyle(color: HealthStatus.critical.color)),
-              ],
-            ],
-          ),
+              ),
+            ),
+          ],
         ),
       ),
       actions: [
@@ -185,9 +203,13 @@ class _MeasurementDialogState extends State<_MeasurementDialog> {
           child: Text(context.tr('Cancelar', 'Cancel')),
         ),
         FilledButton(
-          onPressed: problem != null || saving || widget.controller.busy ? null : _save,
+          onPressed: problem != null || saving || widget.controller.busy
+              ? null
+              : _save,
           child: Text(
-            saving ? context.tr('Guardando…', 'Saving…') : context.tr('Guardar', 'Save'),
+            saving
+                ? context.tr('Guardando…', 'Saving…')
+                : context.tr('Guardar', 'Save'),
           ),
         ),
       ],
@@ -201,7 +223,9 @@ class _MeasurementDialogState extends State<_MeasurementDialog> {
       controller: _text[f.id],
       keyboardType: TextInputType.numberWithOptions(decimal: f.decimal),
       inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(f.decimal ? r'[0-9.,]' : r'[0-9]')),
+        FilteringTextInputFormatter.allow(
+          RegExp(f.decimal ? r'[0-9.,]' : r'[0-9]'),
+        ),
       ],
       decoration: InputDecoration(
         labelText: context.t(f.label),

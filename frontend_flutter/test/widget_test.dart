@@ -4,7 +4,6 @@ import 'package:horion_edge/l10n/language.dart';
 import 'package:horion_edge/main.dart';
 import 'package:horion_edge/models/health_knowledge.dart';
 import 'package:horion_edge/models/hrp_catalog.dart';
-import 'package:horion_edge/screens/risks_screen.dart';
 import 'package:horion_edge/models/telemetry.dart';
 import 'package:horion_edge/screens/trends_screen.dart';
 
@@ -20,6 +19,17 @@ Future<void> _open(
   await tester.tap(find.byIcon(Icons.motion_photos_on));
   await tester.pump();
   await tester.pump();
+}
+
+Future<void> _pageTo(WidgetTester tester, Finder target) async {
+  for (var page = 0; page < 30; page++) {
+    if (target.hitTestable().evaluate().isNotEmpty) return;
+    final next = find.byTooltip('Página siguiente').hitTestable();
+    expect(next, findsOneWidget);
+    await tester.tap(next);
+    await tester.pumpAndSettle();
+  }
+  fail('No se encontró el contenido en las páginas');
 }
 
 void main() {
@@ -118,16 +128,7 @@ void main() {
     await tester.tap(find.text('Tendencias').first);
     await tester.pumpAndSettle();
     expect(find.text('Tu línea base'), findsOneWidget); // Leyenda del gráfico.
-    await tester.scrollUntilVisible(
-      find.text('Resumen frente a tu línea base'),
-      400,
-      scrollable: find
-          .descendant(
-            of: find.byType(TrendsScreen),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
+    await _pageTo(tester, find.text('Resumen frente a tu línea base'));
     expect(find.text('Resumen frente a tu línea base'), findsOneWidget);
     expect(find.textContaining('Base '), findsWidgets);
     expect(find.text('Se necesitan al menos 4 días con datos'), findsNothing);
@@ -140,7 +141,7 @@ void main() {
     );
     await tester.tap(find.widgetWithText(ChoiceChip, 'Base marciana'));
     await tester.pumpAndSettle();
-    expect(find.text('4–24 min (solo de ida)'), findsOneWidget);
+    expect(find.textContaining('4–24 min (solo de ida)'), findsOneWidget);
     expect(find.textContaining('Base marciana · Día 14'), findsOneWidget);
     expect(find.textContaining('del límite de carrera NASA'), findsOneWidget);
 
@@ -245,38 +246,19 @@ void main() {
 
     await tester.tap(find.text('Riesgos y entorno').first);
     await tester.pumpAndSettle();
-    final list = find
-        .descendant(
-          of: find.byType(RisksScreen),
-          matching: find.byType(Scrollable),
-        )
-        .first;
-    await tester.scrollUntilVisible(
-      find.text('Los 5 peligros del vuelo espacial'),
-      400,
-      scrollable: list,
-    );
+    await _pageTo(tester, find.text('Los 5 peligros del vuelo espacial'));
     expect(find.text('Los 5 peligros del vuelo espacial'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Síndrome neuro-ocular (SANS)'),
-      400,
-      scrollable: list,
-    );
+    await _pageTo(tester, find.text('Síndrome neuro-ocular (SANS)'));
     expect(find.text('Vigilado · Vigilar'), findsWidgets);
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Síndrome neuro-ocular (SANS)'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Síndrome neuro-ocular (SANS)'));
+    await tester.tap(find.text('Síndrome neuro-ocular (SANS)').hitTestable());
     await tester.pumpAndSettle();
     expect(
       find.text('Risk of Spaceflight Associated Neuro-ocular Syndrome (SANS)'),
       findsOneWidget,
     );
-    await tester.scrollUntilVisible(
-      find.text('Cáncer inducido por radiación'),
-      400,
-      scrollable: list,
-    );
+    await tester.tap(find.byTooltip('Cerrar'));
+    await tester.pumpAndSettle();
+    await _pageTo(tester, find.text('Cáncer inducido por radiación'));
     expect(find.text('Informativo'), findsWidgets);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -344,7 +326,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ChoiceChip, 'Mars base'));
     await tester.pumpAndSettle();
-    expect(find.text('4–24 min (one way)'), findsOneWidget);
+    expect(find.textContaining('4–24 min (one way)'), findsOneWidget);
     expect(find.textContaining('of the NASA career limit'), findsOneWidget);
 
     await tester.tap(find.text('Orbi assistant').first);

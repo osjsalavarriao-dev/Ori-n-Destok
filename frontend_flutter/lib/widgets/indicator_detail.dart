@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../l10n/language.dart';
 import '../models/health_knowledge.dart';
+import 'viewport_board.dart';
 
 /// Ficha educativa de un indicador: qué es, cómo medirlo, efecto del espacio
 /// y qué hacer según su estado actual.
@@ -21,10 +22,9 @@ Future<void> showIndicatorDetail(
       ],
     ),
     content: SizedBox(
-      width: 520,
-      child: SingleChildScrollView(
-        child: IndicatorDetailBody(ind: ind, value: value, status: status),
-      ),
+      width: 1000,
+      height: MediaQuery.sizeOf(context).height * .65,
+      child: IndicatorDetailBody(ind: ind, value: value, status: status),
     ),
     actions: [
       TextButton(
@@ -47,9 +47,7 @@ class IndicatorDetailBody extends StatelessWidget {
   final HealthStatus status;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    mainAxisSize: MainAxisSize.min,
+  Widget build(BuildContext context) => ViewportBoard(
     children: [
       StatusBanner(
         status: status,
@@ -60,7 +58,10 @@ class IndicatorDetailBody extends StatelessWidget {
         '${context.tr('Rango de referencia', 'Reference range')}: ${context.t(ind.normalRange)}',
         style: const TextStyle(color: Colors.white60, fontSize: 12),
       ),
-      _section(context.tr('¿Qué mide?', 'What does it measure?'), context.t(ind.what)),
+      _section(
+        context.tr('¿Qué mide?', 'What does it measure?'),
+        context.t(ind.what),
+      ),
       _section(
         context.tr('¿Cómo medirlo a bordo?', 'How to measure it on board?'),
         context.t(ind.howToMeasure),
@@ -96,16 +97,11 @@ class IndicatorDetailBody extends StatelessWidget {
     ],
   );
 
-  Widget _section(String title, String body) => Padding(
-    padding: const EdgeInsets.only(top: 14),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 4),
-        Text(body, style: const TextStyle(color: Colors.white70, height: 1.4)),
-      ],
-    ),
+  Widget _section(String title, String body) => BoardSection(
+    title: title,
+    children: [
+      Text(body, style: const TextStyle(color: Colors.white70, height: 1.4)),
+    ],
   );
 }
 
@@ -142,7 +138,10 @@ class StatusBanner extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        Text(context.t(status.escalation), style: const TextStyle(fontSize: 13)),
+        Text(
+          context.t(status.escalation),
+          style: const TextStyle(fontSize: 13),
+        ),
       ],
     ),
   );

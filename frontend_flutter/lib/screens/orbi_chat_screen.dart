@@ -7,6 +7,7 @@ import '../models/health_knowledge.dart';
 
 import '../l10n/language.dart';
 import '../widgets/orbin_avatar.dart';
+import '../widgets/viewport_board.dart';
 import '../services/edge_controller.dart';
 import '../services/local_guidance.dart';
 
@@ -120,7 +121,28 @@ class _OrbiChatScreenState extends State<OrbiChatScreen> {
   @override
   Widget build(BuildContext context) {
     final c = widget.controller;
-    return ListView(
+    return ScreenBoard(
+      key: ValueKey(selected),
+      title: context.tr('Asistente Orbi', 'Orbi assistant'),
+      minColumnWidth: 330,
+      controls: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final request in LocalRequest.values)
+            ChoiceChip(
+              label: Text(context.t(LocalGuidance.label(request))),
+              selected: selected == request,
+              onSelected: (_) {
+                stop();
+                setState(() {
+                  selected = request;
+                  voiceError = null;
+                });
+              },
+            ),
+        ],
+      ),
       children: [
         Row(
           children: [
@@ -179,24 +201,6 @@ class _OrbiChatScreenState extends State<OrbiChatScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final request in LocalRequest.values)
-              ChoiceChip(
-                label: Text(context.t(LocalGuidance.label(request))),
-                selected: selected == request,
-                onSelected: (_) {
-                  stop();
-                  setState(() {
-                    selected = request;
-                    voiceError = null;
-                  });
-                },
-              ),
-          ],
-        ),
         const SizedBox(height: 16),
         Wrap(
           spacing: 12,
@@ -229,34 +233,27 @@ class _OrbiChatScreenState extends State<OrbiChatScreen> {
             child: Text(voiceError!, semanticsLabel: voiceError),
           ),
 
-        SizedBox(
-          child: SingleChildScrollView(
-            child: SizedBox(
-              width: double.infinity,
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: selected == null
-                      ? Column(
-                          children: [
-                            OrbinAvatar(size: 110, status: c.assistantStatus),
-                            Text(
-                              context.tr(
-                                'Selecciona una consulta para ver tus datos y los siguientes pasos.',
-                                'Choose a request to see your data and next steps.',
-                              ),
-                            ),
-                          ],
-                        )
-                      : Text(
-                          LocalGuidance.answer(c, selected!, context.lang),
-                          style: const TextStyle(height: 1.5),
-                        ),
+        if (selected == null)
+          BoardSection(
+            children: [
+              OrbinAvatar(size: 80, status: c.assistantStatus),
+              Text(
+                context.tr(
+                  'Selecciona una consulta para ver tus datos y los siguientes pasos.',
+                  'Choose a request to see your data and next steps.',
                 ),
               ),
+            ],
+          )
+        else
+          for (final paragraph in LocalGuidance.answer(
+            c,
+            selected!,
+            context.lang,
+          ).split('\n').where((p) => p.trim().isNotEmpty))
+            BoardSection(
+              children: [Text(paragraph, style: const TextStyle(height: 1.4))],
             ),
-          ),
-        ),
       ],
     );
   }

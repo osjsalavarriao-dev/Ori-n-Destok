@@ -47,9 +47,11 @@ class _EdgeShellState extends State<EdgeShell> {
           final c = controller;
           return LayoutBuilder(
             builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 1000;
+              final wide =
+                  constraints.maxWidth >= 1200 && constraints.maxHeight >= 700;
               return Scaffold(
                 appBar: AppBar(
+                  toolbarHeight: 44,
                   title: const Text(
                     'ORBIN  /  HORION',
                     style: TextStyle(
@@ -105,12 +107,12 @@ class _EdgeShellState extends State<EdgeShell> {
                             setState(() => selected = v),
                         backgroundColor: const Color(0xFF0B1B24),
                         leading: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                           child: wide
                               ? const Column(
                                   children: [
-                                    OrbinAvatar(size: 72),
-                                    SizedBox(height: 12),
+                                    OrbinAvatar(size: 48),
+                                    SizedBox(height: 8),
                                     Text('AST-001'),
                                     Text(
                                       'ARTEMIS-IV',
@@ -169,8 +171,8 @@ class _EdgeShellState extends State<EdgeShell> {
                             Container(
                               width: double.infinity,
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 10,
+                                horizontal: 12,
+                                vertical: 6,
                               ),
                               color: const Color(0xFF15303A),
                               child: Text(
@@ -212,7 +214,12 @@ class _EdgeShellState extends State<EdgeShell> {
                               ),
                             Expanded(
                               child: Padding(
-                                padding: EdgeInsets.all(wide ? 28 : 16),
+                                padding: const EdgeInsets.fromLTRB(
+                                  12,
+                                  12,
+                                  12,
+                                  4,
+                                ),
                                 child: IndexedStack(
                                   index: selected,
                                   children:
@@ -237,8 +244,7 @@ class _EdgeShellState extends State<EdgeShell> {
                                           .entries
                                           .map(
                                             (entry) => TickerMode(
-                                              enabled:
-                                                                                                    selected == entry.key,
+                                              enabled: selected == entry.key,
                                               child: entry.value,
                                             ),
                                           )
@@ -249,8 +255,9 @@ class _EdgeShellState extends State<EdgeShell> {
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
-                                vertical: 8,
+                                vertical: 4,
                               ),
+                              width: double.infinity,
                               color: const Color(0xFF0B1B24),
                               child: Wrap(
                                 spacing: 20,

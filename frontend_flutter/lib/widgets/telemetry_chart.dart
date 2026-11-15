@@ -6,8 +6,9 @@ import '../l10n/language.dart';
 import '../models/telemetry.dart';
 
 class TelemetryChart extends StatelessWidget {
-  const TelemetryChart({super.key, required this.samples});
+  const TelemetryChart({super.key, required this.samples, this.height = 190});
   final List<Telemetry> samples;
+  final double height;
   @override
   Widget build(BuildContext context) => Semantics(
     label: context.tr(
@@ -15,11 +16,16 @@ class TelemetryChart extends StatelessWidget {
       'Heart rate chart with ${samples.length} readings',
     ),
     child: SizedBox(
-      height: 190,
+      height: height,
       width: double.infinity,
       child: samples.length < 2
           ? Center(
-              child: Text(context.tr('Esperando nuevas lecturas…', 'Waiting for new readings…')),
+              child: Text(
+                context.tr(
+                  'Esperando nuevas lecturas…',
+                  'Waiting for new readings…',
+                ),
+              ),
             )
           : CustomPaint(painter: _Chart(samples)),
     ),

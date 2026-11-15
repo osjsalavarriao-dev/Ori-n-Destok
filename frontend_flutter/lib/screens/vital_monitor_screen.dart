@@ -6,6 +6,7 @@ import '../services/edge_controller.dart';
 import '../widgets/indicator_detail.dart';
 import '../widgets/measurement_dialog.dart';
 import '../widgets/vital_card.dart';
+import '../widgets/viewport_board.dart';
 import '../widgets/orbin_avatar.dart';
 import '../widgets/telemetry_motion.dart';
 import '../widgets/telemetry_chart.dart';
@@ -53,194 +54,139 @@ class VitalMonitorScreen extends StatelessWidget {
     final t = controller.latest;
     final active = controller.alerts.where((a) => a['atendida'] == 0).toList();
     final overall = controller.overallStatus;
-    return ListView(
+    return ScreenBoard(
+      key: ValueKey(active.length),
+      title: context.tr('Monitor vital', 'Vital monitor'),
+      controls: Row(
+        children: [
+          Expanded(
+            child: Text(
+              context.tr(
+                'Tu estado a bordo, de un vistazo.',
+                'Your health on board, at a glance.',
+              ),
+              style: const TextStyle(color: Colors.white60),
+            ),
+          ),
+          FilledButton.icon(
+            onPressed:
+                controller.busy || (!controller.demo && !controller.connected)
+                ? null
+                : () async {
+                    final saved = await showMeasurementDialog(
+                      context,
+                      controller,
+                    );
+                    if (saved == true && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            context.tr(
+                              'Medición registrada.',
+                              'Measurement saved.',
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                  },
+            icon: const Icon(Icons.add),
+            label: Text(context.tr('Registrar medición', 'Log measurement')),
+          ),
+        ],
+      ),
+      minColumnWidth: 290,
+      maxColumns: 4,
       children: [
-        Wrap(
-          spacing: 16,
-          runSpacing: 12,
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
+        BoardSection(
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
               children: [
-                Text(
-                  context.tr('Monitor vital', 'Vital monitor'),
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  context.tr(
-                    'Tu estado a bordo, de un vistazo. Toca un indicador para saber qué mide y qué hacer.',
-                    'Check your status first. Then explore your indicators or record how you feel.',
+                OrbinAvatar(size: 48, status: overall, onTap: openOrbi),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '${context.tr('Estado general', 'Overall status')}: ${context.t(overall.label)}',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: overall.color,
+                    ),
                   ),
-                  style: const TextStyle(color: Color(0xFFA9BDCA)),
                 ),
               ],
             ),
-            FilledButton.icon(
-              onPressed:
-                  controller.busy || (!controller.demo && !controller.connected)
-                  ? null
-                  : () async {
-                      final saved = await showMeasurementDialog(
-                        context,
-                        controller,
-                      );
-                      if (saved == true && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              context.tr(
-                                'Medición registrada.',
-                                'Measurement saved.',
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                    },
-              icon: const Icon(Icons.add),
-              label: Text(context.tr('Registrar medición', 'Log measurement')),
+            const SizedBox(height: 8),
+            Text(context.t(overall.escalation)),
+            TextButton(
+              onPressed: openBodyMap,
+              child: Text(context.tr('Ver mapa corporal', 'View body map')),
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        Card(
-          child: InkWell(
-            onTap: openBodyMap,
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  OrbinAvatar(size: 64, status: overall, onTap: openOrbi),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${context.tr('Estado general', 'Overall status')}: ${context.t(overall.label)}',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: overall.color,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(context.t(overall.escalation)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    context.tr('Ver mapa corporal  ›', 'View body map  ›'),
-                    style: const TextStyle(color: Color(0xFF38BDF8)),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
         for (final alert in active) _alertCard(context, alert),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final columns = constraints.maxWidth > 850
-                ? 4
-                : constraints.maxWidth > 420
-                ? 2
-                : 1;
-            final width = (constraints.maxWidth - (columns - 1) * 14) / columns;
-            return Wrap(
-              spacing: 14,
-              runSpacing: 14,
-              children: [
-                for (final id in _cards)
-                  SizedBox(width: width, child: _card(context, id)),
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: ExpansionTile(
-            title: Text(
-              context.tr('Ver historial de pulso', 'View pulse history'),
-            ),
-            leading: const Icon(Icons.show_chart),
+        if (active.any((a) => a['nivel_severidad'] == 'CRITICAL') &&
+            controller.environment.escalationNote != null)
+          BoardSection(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.tr(
-                        'Frecuencia cardíaca · BPM',
-                        'Heart rate · BPM',
-                      ),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      context.tr(
-                        '${controller.telemetry.length} lecturas · hasta 30 minutos · escala automática',
-                        '${controller.telemetry.length} readings · up to 30 minutes · auto scale',
-                      ),
-                      style: const TextStyle(color: Color(0xFFA9BDCA)),
-                    ),
-                    const SizedBox(height: 12),
-                    if (t != null) ...[
-                      RhythmTrace(bpm: t.bpm, color: overall.color),
-                      Text(
-                        context.tr(
-                          'Ritmo ilustrativo / no es un ECG medido',
-                          'Illustrative rhythm / not a measured ECG',
-                        ),
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    TelemetryChart(samples: controller.telemetry),
-                    if (t != null)
-                      Text(
-                        '${context.tr('Última lectura', 'Last reading')}: ${t.time.toLocal().toString().substring(11, 19)}',
-                        style: const TextStyle(color: Color(0xFFA9BDCA)),
-                      ),
-                  ],
-                ),
+              Text(
+                '${context.t(controller.environment.name)}: ${context.t(controller.environment.escalationNote!)}',
               ),
             ],
           ),
+        for (final id in _cards) _card(context, id),
+        BoardSection(
+          title: context.tr('Ver historial de pulso', 'View pulse history'),
+          children: [
+            Text(
+              context.tr(
+                '${controller.telemetry.length} lecturas · hasta 30 minutos · escala automática',
+                '${controller.telemetry.length} readings · up to 30 minutes · auto scale',
+              ),
+              style: const TextStyle(fontSize: 12, color: Colors.white60),
+            ),
+            TelemetryChart(samples: controller.telemetry, height: 120),
+            if (t != null)
+              Text(
+                '${context.tr('Última lectura', 'Last reading')}: ${t.time.toLocal().toString().substring(11, 19)}',
+                style: const TextStyle(fontSize: 12),
+              ),
+          ],
         ),
-        const SizedBox(height: 12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Wrap(
-              spacing: 24,
-              runSpacing: 12,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                OrbinAvatar(size: 64, status: overall, onTap: openOrbi),
-                Text(
-                  context.tr(
-                    'Orbi, tu compañero a bordo',
-                    'Orbi, your companion on board',
-                  ),
-                  style: const TextStyle(fontSize: 18),
+        if (t != null)
+          BoardSection(
+            children: [
+              RhythmTrace(bpm: t.bpm, color: overall.color),
+              Text(
+                context.tr(
+                  'Ritmo ilustrativo / no es un ECG medido',
+                  'Illustrative rhythm / not a measured ECG',
                 ),
-                FilledButton(
-                  onPressed: openOrbi,
-                  child: Text(context.tr('Abrir Orbi', 'Open Orbi')),
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+        BoardSection(
+          children: [
+            Row(
+              children: [
+                OrbinAvatar(size: 48, status: overall, onTap: openOrbi),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    context.tr(
+                      'Orbi, tu compañero a bordo',
+                      'Orbi, your companion on board',
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
+            FilledButton(
+              onPressed: openOrbi,
+              child: Text(context.tr('Abrir Orbi', 'Open Orbi')),
+            ),
+          ],
         ),
       ],
     );
@@ -251,7 +197,6 @@ class VitalMonitorScreen extends StatelessWidget {
     final status = critical ? HealthStatus.critical : HealthStatus.watch;
     final metric = alert['metrica_afectada'] as String?;
     final ind = indicators.where((i) => i.id == metric).firstOrNull;
-    final env = controller.environment;
     final title = [
       critical
           ? context.tr('ALERTA CRÍTICA', 'CRITICAL ALERT')
@@ -260,9 +205,10 @@ class VitalMonitorScreen extends StatelessWidget {
       context.tr('SIMULACIÓN', 'SIMULATION'),
     ].join(' · ');
     return Card(
+      margin: EdgeInsets.zero,
       color: critical ? const Color(0xFF40222B) : const Color(0xFF3A3420),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -282,17 +228,6 @@ class VitalMonitorScreen extends StatelessWidget {
               context.t(status.escalation),
               style: const TextStyle(color: Color(0xFFA9BDCA), fontSize: 13),
             ),
-            if (critical && env.escalationNote != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  '${context.t(env.name)}: ${context.t(env.escalationNote!)}',
-                  style: const TextStyle(
-                    color: Color(0xFFA9BDCA),
-                    fontSize: 13,
-                  ),
-                ),
-              ),
             const SizedBox(height: 12),
             OutlinedButton(
               onPressed: controller.busy

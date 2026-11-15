@@ -8,6 +8,7 @@ import '../models/health_knowledge.dart';
 import '../models/hrp_catalog.dart';
 import '../services/edge_controller.dart';
 import '../widgets/indicator_detail.dart';
+import '../widgets/viewport_board.dart';
 
 /// Figura humana interactiva: cada región muestra su función, cómo la afecta
 /// el vuelo espacial, sus indicadores con semáforo y medidas de prevención.
@@ -81,58 +82,71 @@ class _BodyMapScreenState extends State<BodyMapScreen>
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 820;
-        return ListView(
+        final compact = constraints.maxHeight < 600;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               context.tr('Mapa corporal', 'Body map'),
-              style: Theme.of(context).textTheme.headlineMedium,
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
-            const SizedBox(height: 8),
-            Text(
-              context.tr(
-                'Toca una zona del cuerpo para ver cómo te afecta el espacio y qué puedes hacer.',
-                'Tap a body area to see how space affects you and what you can do.',
+            if (!compact)
+              Text(
+                context.tr(
+                  'Toca una zona del cuerpo para ver cómo te afecta el espacio y qué puedes hacer.',
+                  'Tap a body area to see how space affects you and what you can do.',
+                ),
+                style: const TextStyle(color: Colors.white60),
               ),
-              style: const TextStyle(color: Colors.white60),
-            ),
-            const SizedBox(height: 20),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final r in bodyRegions)
-                  ChoiceChip(
-                    selected: r.id == selected,
-                    onSelected: (_) => setState(() => selected = r.id),
-                    avatar: Icon(
-                      Icons.circle,
-                      size: 12,
-                      color: statuses[r.id]!.color,
+            const SizedBox(height: 8),
+            if (!wide || compact)
+              DropdownButton<String>(
+                value: selected,
+                isExpanded: true,
+                items: [
+                  for (final r in bodyRegions)
+                    DropdownMenuItem(
+                      value: r.id,
+                      child: Text(context.t(r.name)),
                     ),
-                    label: Text(context.t(r.name)),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            if (wide)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                ],
+                onChanged: (id) {
+                  if (id != null) setState(() => selected = id);
+                },
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final r in bodyRegions)
+                    ChoiceChip(
+                      selected: r.id == selected,
+                      onSelected: (_) => setState(() => selected = r.id),
+                      avatar: Icon(
+                        Icons.circle,
+                        size: 12,
+                        color: statuses[r.id]!.color,
+                      ),
+                      label: Text(context.t(r.name)),
+                    ),
+                ],
+              ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
-                    width: 280,
-                    height: 440,
+                    width: wide ? 180 : 96,
                     child: RepaintBoundary(child: figure),
                   ),
-                  const SizedBox(width: 24),
+                  const SizedBox(width: 12),
                   Expanded(child: panel),
                 ],
-              )
-            else ...[
-              SizedBox(height: 320, child: RepaintBoundary(child: figure)),
-              const SizedBox(height: 20),
-              panel,
-            ],
-            const SizedBox(height: 16),
+              ),
+            ),
+            const SizedBox(height: 4),
             const _Legend(),
           ],
         );
@@ -449,89 +463,87 @@ class _RegionPanel extends StatelessWidget {
     final hasSensors = region.indicatorIds.isNotEmpty;
     final hasCheck = region.symptoms.isNotEmpty;
     final research = researchFor(region.id);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return ViewportBoard(
+      key: ValueKey(region.id),
+      minColumnWidth: 310,
+      children: [
+        BoardSection(
           children: [
-            Text(
-              context.t(region.name),
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+            StatusBanner(
+              status: status,
+              text: hasSensors || hasCheck && status != HealthStatus.unknown
+                  ? '${context.tr('Estado', 'Status')}: ${context.t(status.label)}'
+                  : hasCheck
+                  ? context.tr(
+                      'Responde la autoevaluación de síntomas',
+                      'Answer the symptom self-check',
+                    )
+                  : context.tr(
+                      'Sin sensor directo a bordo',
+                      'No direct sensor on board',
+                    ),
             ),
-            const SizedBox(height: 12),
-            if (hasSensors || (hasCheck && status != HealthStatus.unknown))
-              StatusBanner(
-                status: status,
-                text:
-                    '${context.tr('Estado', 'Status')}: ${context.t(status.label)}',
-              )
-            else if (hasCheck)
-              StatusBanner(
-                status: HealthStatus.unknown,
-                text: context.tr(
-                  'Responde la autoevaluación de síntomas',
-                  'Answer the symptom self-check',
-                ),
-              )
-            else
-              StatusBanner(
-                status: HealthStatus.unknown,
-                text: context.tr(
-                  'Sin sensor directo a bordo',
-                  'No direct sensor on board',
-                ),
-              ),
-            if (hasCheck) _SymptomCheck(controller: controller, region: region),
+          ],
+        ),
+        BoardSection(
+          children: [
             _section(
               context.tr('Función', 'Function'),
               context.t(region.function),
             ),
-            _section(
-              context.tr('Efecto del vuelo espacial', 'Effect of spaceflight'),
-              context.t(region.spaceEffect),
-            ),
-            const SizedBox(height: 10),
+          ],
+        ),
+        BoardSection(
+          title: context.tr(
+            'Efecto del vuelo espacial',
+            'Effect of spaceflight',
+          ),
+          children: [Text(context.t(region.spaceEffect))],
+        ),
+        BoardSection(
+          children: [
             Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: [for (final r in region.hazards) HazardChip(hazard: r)],
+              children: [for (final h in region.hazards) HazardChip(hazard: h)],
             ),
-            if (hasSensors) ...[
-              const SizedBox(height: 18),
+          ],
+        ),
+        if (hasCheck) ..._symptomSections(context, controller, region),
+        if (hasSensors)
+          for (var index = 0; index < region.indicatorIds.length; index++)
+            BoardSection(
+              title: index == 0
+                  ? context.tr('Indicadores', 'Indicators')
+                  : null,
+              children: [_indicatorTile(context, region.indicatorIds[index])],
+            ),
+        for (var index = 0; index < region.prevention.length; index++)
+          BoardSection(
+            title: index == 0 ? context.tr('Prevención', 'Prevention') : null,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.check, size: 16, color: Color(0xFF38BDF8)),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(context.t(region.prevention[index]))),
+                ],
+              ),
+            ],
+          ),
+        for (final s in research)
+          BoardSection(
+            title:
+                '${context.tr('Investigación NASA', 'NASA research')} · ${s.name}',
+            children: [
               Text(
-                context.tr('Indicadores', 'Indicators'),
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                context.t(s.status.label),
+                style: const TextStyle(color: Color(0xFFA99AFB)),
               ),
               const SizedBox(height: 6),
-              for (final id in region.indicatorIds) _indicatorTile(context, id),
-            ],
-            const SizedBox(height: 14),
-            Text(
-              context.tr('Prevención', 'Prevention'),
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            for (final p in region.prevention)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.check, size: 16, color: Color(0xFF38BDF8)),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(context.t(p))),
-                  ],
-                ),
-              ),
-            if (research.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              Text(
-                context.tr(
-                  'Investigación de NASA relacionada',
-                  'Related NASA research',
-                ),
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
+              Text(context.t(s.description)),
+              const SizedBox(height: 6),
               Text(
                 context.tr(
                   'Estudios del Programa de Investigación Humana: no son tratamientos probados.',
@@ -539,61 +551,14 @@ class _RegionPanel extends StatelessWidget {
                 ),
                 style: const TextStyle(color: Colors.white54, fontSize: 12),
               ),
-              for (final s in research)
-                Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.science_outlined,
-                        size: 18,
-                        color: Color(0xFFA99AFB),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${s.name} · ${context.t(s.status.label)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              context.t(s.description),
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                height: 1.4,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
             ],
-            if (region.earthBenefit != null) ...[
-              const SizedBox(height: 18),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.public, size: 18, color: Color(0xFF62DDB0)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${context.tr('Beneficio en la Tierra', 'Benefit on Earth')}: ${context.t(region.earthBenefit!)}',
-                      style: const TextStyle(height: 1.4),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
+          ),
+        if (region.earthBenefit != null)
+          BoardSection(
+            title: context.tr('Beneficio en la Tierra', 'Benefit on Earth'),
+            children: [Text(context.t(region.earthBenefit!))],
+          ),
+      ],
     );
   }
 
@@ -636,64 +601,52 @@ class _RegionPanel extends StatelessWidget {
 }
 
 /// Autoevaluación de síntomas de una zona sin sensor (visión, equilibrio, piel).
-class _SymptomCheck extends StatelessWidget {
-  const _SymptomCheck({required this.controller, required this.region});
-  final EdgeController controller;
-  final BodyRegion region;
-
-  @override
-  Widget build(BuildContext context) {
-    final active = controller.symptoms[region.id] ?? const <String>{};
-    final checked = controller.checkedRegions.contains(region.id);
-    return Padding(
-      padding: const EdgeInsets.only(top: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+List<Widget> _symptomSections(
+  BuildContext context,
+  EdgeController controller,
+  BodyRegion region,
+) {
+  final active = controller.symptoms[region.id] ?? const <String>{};
+  final checked = controller.checkedRegions.contains(region.id);
+  return [
+    for (var index = 0; index < region.symptoms.length; index++)
+      BoardSection(
+        title: index == 0
+            ? context.tr('Autoevaluación de síntomas', 'Symptom self-check')
+            : null,
         children: [
-          Text(
-            context.tr('Autoevaluación de síntomas', 'Symptom self-check'),
-            style: const TextStyle(fontWeight: FontWeight.w600),
+          CheckboxListTile(
+            key: ValueKey('symptom-${region.symptoms[index].id}'),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            value: active.contains(region.symptoms[index].id),
+            onChanged: (v) => controller.setSymptom(
+              region.id,
+              region.symptoms[index].id,
+              v ?? false,
+            ),
+            title: Text(context.t(region.symptoms[index].question)),
           ),
-          for (final s in region.symptoms)
-            CheckboxListTile(
-              key: ValueKey('symptom-${s.id}'),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              controlAffinity: ListTileControlAffinity.leading,
-              value: active.contains(s.id),
-              onChanged: (v) =>
-                  controller.setSymptom(region.id, s.id, v ?? false),
-              title: Text(context.t(s.question)),
-            ),
-          if (active.isEmpty)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed: () => controller.confirmNoSymptoms(region.id),
-                icon: Icon(
-                  checked ? Icons.check : Icons.check_circle_outline,
-                  size: 18,
-                ),
-                label: Text(
-                  checked
-                      ? context.tr(
-                          'Sin síntomas registrados',
-                          'No symptoms recorded',
-                        )
-                      : context.tr('No tengo ninguno', 'I have none of these'),
-                ),
-              ),
-            ),
-          for (final s in region.symptoms.where((s) => active.contains(s.id)))
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                context.t(s.advice),
-                style: TextStyle(color: HealthStatus.watch.color),
-              ),
+          if (active.contains(region.symptoms[index].id))
+            Text(
+              context.t(region.symptoms[index].advice),
+              style: TextStyle(color: HealthStatus.watch.color),
             ),
         ],
       ),
-    );
-  }
+    if (active.isEmpty)
+      OutlinedButton.icon(
+        onPressed: () => controller.confirmNoSymptoms(region.id),
+        icon: Icon(
+          checked ? Icons.check : Icons.check_circle_outline,
+          size: 18,
+        ),
+        label: Text(
+          checked
+              ? context.tr('Sin síntomas registrados', 'No symptoms recorded')
+              : context.tr('No tengo ninguno', 'I have none of these'),
+        ),
+      ),
+  ];
 }
